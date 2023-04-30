@@ -7,9 +7,10 @@ import requests
 import speech_recognition as sr
 import jinja_partials
 from flask import Flask, request, render_template
-from pydub import AudioSegment
 from flask_sqlalchemy import SQLAlchemy
 from bs4 import BeautifulSoup
+
+from services import files
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///snippets.sqlite3"
@@ -53,34 +54,6 @@ class User(db.Model):
         return f"<User {self.id} - {self.name}>"
 
 
-def delete_oldest_file(size_threshold=100 * 1000 * 1000, dir="./tmp"):
-    directory_size = sum(os.path.getsize(os.path.join(dir, f)) for f in os.listdir(dir))
-
-    if directory_size < size_threshold:
-        return
-
-    files = os.listdir(dir)
-    oldest_file = min(files, key=os.path.getctime)
-    os.remove(os.path.join(dir, oldest_file))
-
-
-def download_file(url, directory="./tmp", filename=None):
-    delete_oldest_file()
-
-    r = requests.get(url)
-    parsed_url = urlparse(url)
-
-    if not filename:
-        filename = parsed_url.path.split("/")[-1]
-    else:
-        filename = filename + "." + parsed_url.path.split(".")[-1]
-
-    filepath = os.path.join(directory, filename)
-    with open(filepath, "wb") as f:
-        f.write(r.content)
-    return filepath
-
-
 def get_seconds_from_time(time):
     """
     time: str
@@ -93,23 +66,6 @@ def get_seconds_from_time(time):
         seconds = time
     seconds = seconds.replace("s", "")
     return int(minutes) * 60 + int(seconds)
-
-
-def create_wav_clip(filepath, seconds_location, duration):
-    extension = filepath.split(".")[-1]
-    podcast = AudioSegment.from_file(filepath, format=extension)
-    start_ms = (seconds_location - (duration // 2)) * 1000
-    if start_ms < 0:
-        start_ms = 0
-
-    end_ms = (seconds_location + (duration // 2)) * 1000
-    if end_ms > len(podcast):
-        end_ms = len(podcast)
-
-    clip = podcast[start_ms:end_ms]
-    clip_wav = os.path.splitext(filepath)[0] + ".wav"
-    clip.export(clip_wav, format="wav")
-    return clip_wav
 
 
 # TODO: Consider switching to just using whisper instead of speech_recognition
@@ -155,7 +111,7 @@ def process_pocketcast_link(url):
     r = requests.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
     download_link = soup.find("a", {"class": "download-button"})["href"]
-    audio_filepath = download_file(download_link)
+    audio_filepath = files.download_file(download_link)
 
     title = soup.find("meta", {"property": "og:title"})["content"]
     thumb_url = soup.find("meta", {"property": "og:image"})["content"]
@@ -181,7 +137,7 @@ def add_db_source(url, title=None, thumbnail=None, provider=None):
 
 def add_snippet(audio_filepath, time, duration, source, user_id):
     seconds = get_seconds_from_time(time)
-    clip_wav = create_wav_clip(audio_filepath, seconds, duration)
+    clip_wav = files.create_wav_clip(audio_filepath, seconds, duration)
     text = whisper_recognize(clip_wav)
     snippet = Snippet(
         source_id=source.id, user_id=user_id, time=seconds, duration=duration, text=text
@@ -201,11 +157,11 @@ def create_snippet(url, user_id, time, duration):
     elif parsed_url.hostname in ["pca.st"]:
         source, audio_filepath, time = process_pocketcast_link(url)
     else:
-        audio_filepath = download_file(url)
+        audio_filepath = files.download_file(url)
         source = add_db_source(url, title=title, thumbnail=thumbnail_path)
 
     add_snippet(audio_filepath, time, duration, source, user_id)
-    return render_template("partials/snippet_list.html", sources=get_sources(1))
+    return render_template("partials/sources.html", sources=get_sources(1))
 
 
 def get_sources(user_id):
@@ -219,11 +175,6 @@ def get_sources(user_id):
     for source in sources:
         source.snippets.sort(key=lambda x: x.time, reverse=False)
     return sources
-
-
-def get_snippets(user_id):
-    sources = get_sources(user_id)
-    return render_template("index.html", sources=sources)
 
 
 @app.route("/")
