@@ -1,0 +1,37 @@
+<div id="sources">
+    {% for source in sources %}
+    <div class="source" id="source{{source.id}}">
+        <div class="row">
+            <div class="col-md-auto d-flex align-items-center pb-3">
+                <a href="{{source.url}}" class="text-decoration-none text-dark">
+                    {% if source.provider == "youtube" %}
+                    <i class="fas fa-brands fa-youtube fa-2xl" style="color: red;"></i>
+                    {% elif source.provider == "pocketcast" %}
+                    <i class="fas fa-sharp fa-solid fa-podcast fa-2xl" style="color: red"></i>
+                    {% endif %}
+                </a>
+            </div>
+            <div class="col-11">
+                <a href="{{source.url}}" class="text-decoration-none text-dark">
+                    <p class="fs-2">{{ source.title }}</p>
+                </a>
+            </div>
+        </div>
+        <div class="row pb-5">
+            <div class="col-3">
+                <img src={{source.thumb_url}} class="img-fluid shadow">
+                <i hx-trigger="click" hx-delete="/source/{{source.id}}" hx-target="#source{{source.id}}"
+                    hx-confirm="Are you sure?" class="fa-sharp fa-regular fa-trash-can fa-xl pt-4 pe-2 redhover"></i>
+                <i class="fa-sharp fa-solid fa-copy fa-xl redhover liveToastBtn"
+                    onclick="copyToClipboard({{source.id}})"></i>
+            </div>
+            <div class="col-9">
+                {% for snippet in source.snippets %}
+                {{ render_partial("partials/snippet.html", snippet=snippet, source=source) }}
+                {% endfor %}
+            </div>
+        </div>
+        <hr class="border-1" />
+    </div>
+    {% endfor %}
+</div>

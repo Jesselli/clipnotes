@@ -1,0 +1,17 @@
+{% extends "shared/_layout.html" %}
+{% block main_content %}
+{{ render_partial("partials/sources.html", sources=sources) }}
+{% endblock %}
+
+{% block additional_css %}
+<style>
+    .redhover {
+        transition: all .2s ease-in-out;
+    }
+
+    .redhover:hover {
+        /* transform: scale(1.2);  */
+        color: red;
+    }
+</style>
+{% endblock %}

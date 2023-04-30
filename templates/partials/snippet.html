@@ -1,0 +1,28 @@
+<div id="snippet{{snippet.id}}">
+    <figure>
+        <blockquote class="blockquote pb-4">
+            <div class="row">
+                <div class="col-auto"><i class="fa-sharp fa-solid fa-quote-left"
+                        style="color: gray"></i></div>
+                <div class="col">
+                    <div contenteditable="true" hx-trigger="blur" hx-put="/snippet/{{snippet.id}}"
+                        hx-vals="javascript:{text:htmx.find('#snippetText{{snippet.id}}').innerText}"
+                        hx-target="#snippetText{{snippet.id}}">
+                        <div name="text" id="snippetText{{snippet.id}}">{{ snippet.text }}</div>
+                    </div>
+
+                </div>
+                <div class="col-auto align-self-end"><i class="fa-sharp fa-solid fa-quote-right"
+                        style="color: gray"></i></div>
+            </div>
+        </blockquote>
+        <figcaption class="blockquote-footer text-end">
+            {{snippet.created_at}}
+            <a href="{{source.url}}?t={{snippet.time}}" class="text-decoration-none text-dark">
+                ({{snippet.time - snippet.duration//2}}s to {{snippet.time + snippet.duration//2}}s)
+            </a>
+            <i class="fa-solid fa-circle-minus redhover ps-5" hx-delete="/snippet/{{snippet.id}}"
+                hx-trigger="click" hx-target="#snippet{{snippet.id}}" hx-confirm="Are you sure?"></i>
+        </figcaption>
+    </figure>
+</div>
