@@ -7,51 +7,15 @@ import requests
 import speech_recognition as sr
 import jinja_partials
 from flask import Flask, request, render_template
-from flask_sqlalchemy import SQLAlchemy
 from bs4 import BeautifulSoup
+from models import Snippet, Source, db
 
 from services import files
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///snippets.sqlite3"
-db = SQLAlchemy(app)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 r = sr.Recognizer()
-
-
-class Snippet(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    source_id = db.Column(db.Integer, db.ForeignKey("source.id"), nullable=False)
-    time = db.Column(db.Integer, nullable=False)
-    duration = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=db.func.now())
-    text = db.Column(db.Text, nullable=False)
-
-    def __repr__(self):
-        return f"<Snippet {self.id} - {self.text}>"
-
-
-class Source(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(255), nullable=False, unique=True)
-    title = db.Column(db.String(255))
-    snippets = db.relationship("Snippet", backref="source")
-    thumb_url = db.Column(db.String(255))
-    provider = db.Column(db.String(255))
-
-    def __repr__(self):
-        return f"<Source {self.id} - {self.title}>"
-
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    first_name = db.Column(db.String(255))
-    last_name = db.Column(db.String(255))
-    email = db.Column(db.String(255), unique=True)
-    snippets = db.relationship("Snippet", backref="user")
-
-    def __repr__(self):
-        return f"<User {self.id} - {self.name}>"
 
 
 def get_seconds_from_time(time):
@@ -101,7 +65,7 @@ def process_youtube_link(url):
     title = yt.title
 
     time = get_time_from_url(url)
-    source = add_db_source(
+    source = add_source(
         url, title=title, thumbnail=yt.thumbnail_url, provider="youtube"
     )
     return source, audio_filepath, time
@@ -117,11 +81,11 @@ def process_pocketcast_link(url):
     thumb_url = soup.find("meta", {"property": "og:image"})["content"]
 
     time = get_time_from_url(url)
-    source = add_db_source(url, title, thumb_url, "pocketcast")
+    source = add_source(url, title, thumb_url, "pocketcast")
     return source, audio_filepath, time
 
 
-def add_db_source(url, title=None, thumbnail=None, provider=None):
+def add_source(url, title=None, thumbnail=None, provider=None):
     parsed_url = urlparse(url)
     url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
 
@@ -148,7 +112,7 @@ def add_snippet(audio_filepath, time, duration, source, user_id):
     return text
 
 
-def create_snippet(url, user_id, time, duration):
+def process_source_url(url, user_id, time, duration):
     title = None
     thumbnail_path = None
     parsed_url = urlparse(url)
@@ -158,7 +122,7 @@ def create_snippet(url, user_id, time, duration):
         source, audio_filepath, time = process_pocketcast_link(url)
     else:
         audio_filepath = files.download_file(url)
-        source = add_db_source(url, title=title, thumbnail=thumbnail_path)
+        source = add_source(url, title=title, thumbnail=thumbnail_path)
 
     add_snippet(audio_filepath, time, duration, source, user_id)
     return render_template("partials/sources.html", sources=get_sources(1))
@@ -216,13 +180,13 @@ def snippets():
             duration = request.form.get("duration", 60, type=int)
             time = request.form.get("time", 0)
             user_id = 1
-            return create_snippet(url, user_id, time, duration)
+            return process_source_url(url, user_id, time, duration)
         else:
             url = request.args.get("url")
             time = request.args.get("time")
             duration = request.args.get("duration", 60, type=int)
             user_id = 1
-            return create_snippet(url, user_id, time, duration)
+            return process_source_url(url, user_id, time, duration)
 
 
 @app.route("/snippet/<int:snippet_id>", methods=["GET", "PUT", "DELETE"])
@@ -239,5 +203,6 @@ def test(snippet_id):
 
 
 if __name__ == "__main__":
+    db.init_app(app)
     jinja_partials.register_extensions(app)
     app.run(debug=True)
