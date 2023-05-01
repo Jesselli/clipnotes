@@ -1,208 +1,117 @@
-import re
-import os
-from urllib.parse import urlparse, parse_qs
+# import re
+# from urllib.parse import parse_qs, urlparse
 
-import pytube
-import requests
-import speech_recognition as sr
 import jinja_partials
-from flask import Flask, request, render_template
-from bs4 import BeautifulSoup
-from models import Snippet, Source, db
+# import speech_recognition as sr
+from flask import Flask
 
-from services import files
+from models import db
+# from services import files
+from routes import test
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///snippets.sqlite3"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-r = sr.Recognizer()
+# r = sr.Recognizer()
 
 
-def get_seconds_from_time(time):
-    """
-    time: str
-        format: 1m30s or 90s or 90
-    """
-    if "m" in time:
-        minutes, seconds = time.split("m")
-    else:
-        minutes = 0
-        seconds = time
-    seconds = seconds.replace("s", "")
-    return int(minutes) * 60 + int(seconds)
+# def get_seconds_from_time(time):
+#     """
+#     time: str
+#         format: 1m30s or 90s or 90
+#     """
+#     if "m" in time:
+#         minutes, seconds = time.split("m")
+#     else:
+#         minutes = 0
+#         seconds = time
+#     seconds = seconds.replace("s", "")
+#     return int(minutes) * 60 + int(seconds)
 
 
-# TODO: Consider switching to just using whisper instead of speech_recognition
-def whisper_recognize(clip):
-    with sr.AudioFile(clip) as source:
-        audio = r.record(source)
-        text_whisper = r.recognize_whisper(audio)
-    return text_whisper
+# # TODO: Consider switching to just using whisper instead of speech_recognition
+# def whisper_recognize(clip):
+#     with sr.AudioFile(clip) as source:
+#         audio = r.record(source)
+#         text_whisper = r.recognize_whisper(audio)
+#     return text_whisper
 
 
-def get_time_from_url(url):
-    parsed_url = urlparse(url)
-    params = parse_qs(parsed_url.query)
-    if "t" in params:
-        time = params["t"][0]
-        return time
+# def get_time_from_url(url):
+#     parsed_url = urlparse(url)
+#     params = parse_qs(parsed_url.query)
+#     if "t" in params:
+#         time = params["t"][0]
+#         return time
 
-    fragment = parsed_url.fragment
-    regex = "t=(\d+[sm]?\d+[s]?)"
-    time = re.search(regex, fragment)
-    if time:
-        time = time.group(1)
-        return time
+#     fragment = parsed_url.fragment
+#     regex = "t=(\d+[sm]?\d+[s]?)"
+#     time = re.search(regex, fragment)
+#     if time:
+#         time = time.group(1)
+#         return time
 
-    return 0
-
-
-def process_youtube_link(url):
-    yt = pytube.YouTube(url, use_oauth=True, allow_oauth_cache=True)
-    audio_stream = yt.streams.filter(only_audio=True).first()
-    audio_stream.download(output_path="./tmp", filename=audio_stream.default_filename)
-    audio_filepath = os.path.join("./tmp", audio_stream.default_filename)
-    title = yt.title
-
-    time = get_time_from_url(url)
-    source = add_source(
-        url, title=title, thumbnail=yt.thumbnail_url, provider="youtube"
-    )
-    return source, audio_filepath, time
+#     return 0
 
 
-def process_pocketcast_link(url):
-    r = requests.get(url)
-    soup = BeautifulSoup(r.text, "html.parser")
-    download_link = soup.find("a", {"class": "download-button"})["href"]
-    audio_filepath = files.download_file(download_link)
+# def add_source(url, title=None, thumbnail=None, provider=None):
+#     parsed_url = urlparse(url)
+#     url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
 
-    title = soup.find("meta", {"property": "og:title"})["content"]
-    thumb_url = soup.find("meta", {"property": "og:image"})["content"]
-
-    time = get_time_from_url(url)
-    source = add_source(url, title, thumb_url, "pocketcast")
-    return source, audio_filepath, time
-
-
-def add_source(url, title=None, thumbnail=None, provider=None):
-    parsed_url = urlparse(url)
-    url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
-
-    existing_source = Source.query.filter_by(url=url).first()
-    if existing_source:
-        source = existing_source
-    else:
-        source = Source(url=url, title=title, thumb_url=thumbnail, provider=provider)
-        db.session.add(source)
-        db.session.commit()
-    return source
+#     existing_source = Source.query.filter_by(url=url).first()
+#     if existing_source:
+#         source = existing_source
+#     else:
+#         source = Source(url=url, title=title, thumb_url=thumbnail, provider=provider)
+#         db.session.add(source)
+#         db.session.commit()
+#     return source
 
 
-def add_snippet(audio_filepath, time, duration, source, user_id):
-    seconds = get_seconds_from_time(time)
-    clip_wav = files.create_wav_clip(audio_filepath, seconds, duration)
-    text = whisper_recognize(clip_wav)
-    snippet = Snippet(
-        source_id=source.id, user_id=user_id, time=seconds, duration=duration, text=text
-    )
-    db.session.add(snippet)
-    db.session.commit()
+# def add_snippet(audio_filepath, time, duration, source, user_id):
+#     seconds = get_seconds_from_time(time)
+#     clip_wav = files.create_wav_clip(audio_filepath, seconds, duration)
+#     text = whisper_recognize(clip_wav)
+#     snippet = Snippet(
+#         source_id=source.id, user_id=user_id, time=seconds, duration=duration, text=text
+#     )
+#     db.session.add(snippet)
+#     db.session.commit()
 
-    return text
-
-
-def process_source_url(url, user_id, time, duration):
-    title = None
-    thumbnail_path = None
-    parsed_url = urlparse(url)
-    if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
-        source, audio_filepath, time = process_youtube_link(url)
-    elif parsed_url.hostname in ["pca.st"]:
-        source, audio_filepath, time = process_pocketcast_link(url)
-    else:
-        audio_filepath = files.download_file(url)
-        source = add_source(url, title=title, thumbnail=thumbnail_path)
-
-    add_snippet(audio_filepath, time, duration, source, user_id)
-    return render_template("partials/sources.html", sources=get_sources(1))
+#     return text
 
 
-def get_sources(user_id):
-    sources = (
-        db.session()
-        .query(Source)
-        .join(Snippet)
-        .order_by(Snippet.created_at.desc())
-        .all()
-    )
-    for source in sources:
-        source.snippets.sort(key=lambda x: x.time, reverse=False)
-    return sources
+# def process_source_url(url, user_id, time, duration):
+#     title = None
+#     thumbnail_path = None
+#     parsed_url = urlparse(url)
+#     if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
+#         source, audio_filepath, time = process_youtube_link(url)
+#     elif parsed_url.hostname in ["pca.st"]:
+#         source, audio_filepath, time = process_pocketcast_link(url)
+#     else:
+#         audio_filepath = files.download_file(url)
+#         source = add_source(url, title=title, thumbnail=thumbnail_path)
+
+#     add_snippet(audio_filepath, time, duration, source, user_id)
+#     return render_template("partials/sources.html", sources=get_sources(1))
 
 
-@app.route("/")
-def index():
-    # TODO Add support for multiple users
-    user_id = 1
-    sources = get_sources(user_id)
-    return render_template("index.html", sources=sources)
-
-
-@app.route("/source/<int:source_id>/markdown", methods=["GET"])
-def source_to_markdown(source_id):
-    source = Source.query.get(source_id)
-    snippets = Snippet.query.filter_by(source_id=source_id).all()
-    md = f"# {source.title}\n\n"
-    md += f"![thumbnail]({source.thumb_url})\n\n"
-    md += f"[{source.title}]({source.url})\n\n"
-    for snippet in snippets:
-        md += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
-    return md
-
-
-@app.route("/source/<int:source_id>", methods=["DELETE"])
-def delete_source(source_id):
-    snippets = Snippet.query.filter_by(source_id=source_id).all()
-    for snippet in snippets:
-        db.session.delete(snippet)
-    source = Source.query.get(source_id)
-    db.session.delete(source)
-    db.session.commit()
-    return "<div/>"
-
-
-@app.route("/snippets", methods=["GET", "POST"])
-def snippets():
-    if request.method == "POST":
-        if request.form:
-            url = request.form.get("url")
-            duration = request.form.get("duration", 60, type=int)
-            time = request.form.get("time", 0)
-            user_id = 1
-            return process_source_url(url, user_id, time, duration)
-        else:
-            url = request.args.get("url")
-            time = request.args.get("time")
-            duration = request.args.get("duration", 60, type=int)
-            user_id = 1
-            return process_source_url(url, user_id, time, duration)
-
-
-@app.route("/snippet/<int:snippet_id>", methods=["GET", "PUT", "DELETE"])
-def test(snippet_id):
-    if request.method == "PUT":
-        text = request.form.get("text")
-        Snippet.query.filter_by(id=snippet_id).update({"text": text})
-        db.session.commit()
-        return text
-    elif request.method == "DELETE":
-        Snippet.query.filter_by(id=snippet_id).delete()
-        db.session.commit()
-        return "<div/>"
+# def get_sources(user_id):
+#     sources = (
+#         db.session()
+#         .query(Source)
+#         .join(Snippet)
+#         .order_by(Snippet.created_at.desc())
+#         .all()
+#     )
+#     for source in sources:
+#         source.snippets.sort(key=lambda x: x.time, reverse=False)
+#     return sources
 
 
 if __name__ == "__main__":
     db.init_app(app)
+    app.register_blueprint(test)
     jinja_partials.register_extensions(app)
     app.run(debug=True)
