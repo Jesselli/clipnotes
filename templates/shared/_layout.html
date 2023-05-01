@@ -3,10 +3,10 @@
 
 <head>
     <meta charset="utf-8" />
-    <title></title>
+    <title>AudioNotes</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="/static/fontawesome/css/all.min.css" crossorigin="anonymous" />
-
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     {% block additional_css %}{% endblock %}
 </head>
 
@@ -14,8 +14,8 @@
     <nav class="navbar fixed-top bg-dark bg-body-tertiary" data-bs-theme="dark">
         <div class="container-fluid">
             <a class="navbar-brand fs-2" href="#">
-                <i class="fa-solid fa-book pe-2"></i>
-                My Snippets
+                <i class="fa-solid fa-microphone pe-2"></i>
+                AudioNotes
             </a>
             <form hx-post="/snippets" hx-target="#sources" hx-indicator=".htmx-indicator">
                 <div class="row">

@@ -4,13 +4,12 @@ from models import Source, Snippet, db
 from services import source_processors
 from services import snippet_db
 
-# TODO: Rename this blueprint to something more meaningful
-test = Blueprint("test", __name__)
+blueprint = Blueprint("test", __name__)
 
-# TODO: Separate out the backend from the HTML rendering
+# TODO: Separate out the api from the rendering
 
 
-@test.route("/")
+@blueprint.get("/")
 def index():
     # TODO Add support for multiple users
     user_id = 1
@@ -18,19 +17,19 @@ def index():
     return render_template("index.html", sources=sources)
 
 
-@test.route("/source/<int:source_id>/markdown", methods=["GET"])
+@blueprint.get("/source/<int:source_id>/markdown")
 def source_to_markdown(source_id):
     source = Source.query.get(source_id)
     snippets = Snippet.query.filter_by(source_id=source_id).all()
-    md = f"# {source.title}\n\n"
-    md += f"![thumbnail]({source.thumb_url})\n\n"
-    md += f"[{source.title}]({source.url})\n\n"
+    markdown = f"# {source.title}\n\n"
+    markdown += f"![thumbnail]({source.thumb_url})\n\n"
+    markdown += f"[{source.title}]({source.url})\n\n"
     for snippet in snippets:
-        md += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
-    return md
+        markdown += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
+    return markdown
 
 
-@test.route("/source/<int:source_id>", methods=["DELETE"])
+@blueprint.delete("/source/<int:source_id>")
 def delete_source(source_id):
     snippets = Snippet.query.filter_by(source_id=source_id).all()
     for snippet in snippets:
@@ -41,38 +40,30 @@ def delete_source(source_id):
     return ""
 
 
-# TODO: We may not need the GET method here
-@test.route("/snippets", methods=["GET", "POST"])
-def snippets():
-    if request.method == "POST":
-        if request.form:
-            url = request.form.get("url")
-            duration = request.form.get("duration", 60, type=int)
-            time = request.form.get("time", 0)
-            # TODO: Add support for other users
-            user_id = 1
-            source_processors.process_url(url, user_id, time, duration)
-            sources = snippet_db.get_sources(user_id)
-            return render_template("partials/sources.html", sources=sources)
-        else:
-            url = request.args.get("url")
-            time = request.args.get("time")
-            duration = request.args.get("duration", 60, type=int)
-            # TODO: Add support for other users
-            user_id = 1
-            source_processors.process_url(url, user_id, time, duration)
-            sources = snippet_db.get_sources(user_id)
-            return render_template("partials/sources.html", sources=sources)
+@blueprint.post("/snippets")
+def create_snippet():
+    sources = []
+    if request.form:
+        url = request.form.get("url")
+        duration = request.form.get("duration", 60, type=int)
+        time = request.form.get("time", 0)
+        # TODO: Add support for other users
+        user_id = 1
+        source_processors.process_url(url, user_id, time, duration)
+        sources = snippet_db.get_sources(user_id)
+    return render_template("partials/sources.html", sources=sources)
 
 
-@test.route("/snippet/<int:snippet_id>", methods=["GET", "PUT", "DELETE"])
-def snippet(snippet_id):
-    if request.method == "PUT":
-        text = request.form.get("text")
-        Snippet.query.filter_by(id=snippet_id).update({"text": text})
-        db.session.commit()
-        return text
-    elif request.method == "DELETE":
-        Snippet.query.filter_by(id=snippet_id).delete()
-        db.session.commit()
-        return ""
+@blueprint.put("/snippet/<int:snippet_id>")
+def update_snippet(snippet_id):
+    text = request.form.get("text")
+    Snippet.query.filter_by(id=snippet_id).update({"text": text})
+    db.session.commit()
+    return text
+
+
+@blueprint.delete("/snippet/<int:snippet_id>")
+def delete_snippet(snippet_id):
+    Snippet.query.filter_by(id=snippet_id).delete()
+    db.session.commit()
+    return ""

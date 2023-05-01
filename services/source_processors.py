@@ -21,7 +21,7 @@ def get_time_from_url(url):
         return time
 
     fragment = parsed_url.fragment
-    regex = "t=(\d+[sm]?\d+[s]?)"
+    regex = r"t=(\d+[sm]?\d+[s]?)"
     time = re.search(regex, fragment)
     if time:
         time = time.group(1)
