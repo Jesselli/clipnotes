@@ -4,8 +4,10 @@ from urllib.parse import urlparse
 import requests
 from pydub import AudioSegment
 
+from config import Config
 
-def delete_oldest_file(size_threshold=100 * 1000 * 1000, dir="./tmp"):
+
+def delete_oldest_file(size_threshold=Config.TMP_MAX_SIZE, dir="./tmp"):
     directory_size = 0
     for f in os.listdir(dir):
         directory_size += os.path.getsize(os.path.join(dir, f))
