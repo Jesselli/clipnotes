@@ -6,11 +6,9 @@ import pytube
 import requests
 import speech_recognition as sr
 from bs4 import BeautifulSoup
-from flask import render_template
 
 from models import Snippet, Source, db
 from services import files
-from services import snippet_db
 
 r = sr.Recognizer()
 
@@ -94,8 +92,6 @@ def process_url(url, user_id, time, duration):
         source = add_source(url, title=title, thumbnail=thumbnail_path)
 
     add_snippet(audio_filepath, time, duration, source, user_id)
-    # TODO: Move this elsewhere -- this function shouldn't be rendering the template
-    return render_template("partials/sources.html", sources=snippet_db.get_sources(1))
 
 
 def process_youtube_link(url):

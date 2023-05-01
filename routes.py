@@ -4,7 +4,10 @@ from models import Source, Snippet, db
 from services import source_processors
 from services import snippet_db
 
+# TODO: Rename this blueprint to something more meaningful
 test = Blueprint("test", __name__)
+
+# TODO: Separate out the backend from the HTML rendering
 
 
 @test.route("/")
@@ -35,9 +38,10 @@ def delete_source(source_id):
     source = Source.query.get(source_id)
     db.session.delete(source)
     db.session.commit()
-    return "<div/>"
+    return ""
 
 
+# TODO: We may not need the GET method here
 @test.route("/snippets", methods=["GET", "POST"])
 def snippets():
     if request.method == "POST":
@@ -45,14 +49,20 @@ def snippets():
             url = request.form.get("url")
             duration = request.form.get("duration", 60, type=int)
             time = request.form.get("time", 0)
+            # TODO: Add support for other users
             user_id = 1
-            return source_processors.process_url(url, user_id, time, duration)
+            source_processors.process_url(url, user_id, time, duration)
+            sources = snippet_db.get_sources(user_id)
+            return render_template("partials/sources.html", sources=sources)
         else:
             url = request.args.get("url")
             time = request.args.get("time")
             duration = request.args.get("duration", 60, type=int)
+            # TODO: Add support for other users
             user_id = 1
-            return source_processors.process_url(url, user_id, time, duration)
+            source_processors.process_url(url, user_id, time, duration)
+            sources = snippet_db.get_sources(user_id)
+            return render_template("partials/sources.html", sources=sources)
 
 
 @test.route("/snippet/<int:snippet_id>", methods=["GET", "PUT", "DELETE"])
@@ -65,4 +75,4 @@ def snippet(snippet_id):
     elif request.method == "DELETE":
         Snippet.query.filter_by(id=snippet_id).delete()
         db.session.commit()
-        return "<div/>"
+        return ""
