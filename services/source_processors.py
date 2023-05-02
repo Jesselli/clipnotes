@@ -1,4 +1,5 @@
 import re
+import uuid
 from urllib.parse import parse_qs, urlparse
 
 import yt_dlp
@@ -98,9 +99,10 @@ def process_url(url, user_id, time, duration):
 
 
 def process_youtube_link(url):
+    filename = uuid.uuid4()
     ydl_opts = {
         "format": "mp3/bestaudio/best",
-        'outtmpl': f'{Config.TMP_DIRECTORY}/%(title)s.%(ext)s',
+        'outtmpl': f'{Config.TMP_DIRECTORY}/{filename}.%(ext)s',
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -115,7 +117,7 @@ def process_youtube_link(url):
         ydl.download([url])
 
     title = info_dict.get("title", "")
-    audio_filepath = f"{Config.TMP_DIRECTORY}/{title}.mp3"
+    audio_filepath = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
     thumbnail = info_dict.get("thumbnail", "")
     time = get_time_from_url(url)
     source = add_source(
