@@ -1,5 +1,6 @@
 import re
 import uuid
+from queue import Queue
 from urllib.parse import parse_qs, urlparse
 
 import yt_dlp
@@ -7,13 +8,12 @@ import requests
 import speech_recognition as sr
 from bs4 import BeautifulSoup
 
-from models import Snippet, Source, db
+from models import Snippet, Source, Session
 from services import files
 from config import Config
 
 r = sr.Recognizer()
-
-# TODO Implement a queue so that multiple requests can be processed sequentially
+queue = Queue()
 
 
 def get_time_from_url(url):
@@ -59,13 +59,13 @@ def add_source(url, title=None, thumbnail=None, provider=None):
     parsed_url = urlparse(url)
     url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
 
-    existing_source = Source.query.filter_by(url=url).first()
+    existing_source = Session.query(Source).filter_by(url=url).first()
     if existing_source:
         source = existing_source
     else:
         source = Source(url=url, title=title, thumb_url=thumbnail, provider=provider)
-        db.session.add(source)
-        db.session.commit()
+        Session.add(source)
+        Session.commit()
     return source
 
 
@@ -76,8 +76,8 @@ def add_snippet(audio_filepath, time, duration, source, user_id):
     snippet = Snippet(
         source_id=source.id, user_id=user_id, time=seconds, duration=duration, text=text
     )
-    db.session.add(snippet)
-    db.session.commit()
+    Session.add(snippet)
+    Session.commit()
 
     return text
 
@@ -138,3 +138,15 @@ def process_pocketcast_link(url):
     time = get_time_from_url(url)
     source = add_source(url, title, thumb_url, "pocketcast")
     return source, audio_filepath, time
+
+
+def process_queue():
+    while True:
+        task = queue.get()
+        if task:
+            process_url(task["url"], task["user_id"], task["time"], task["duration"])
+            queue.task_done()
+
+
+def add_to_queue(url, user_id, time, duration):
+    queue.put({"url": url, "user_id": user_id, "time": time, "duration": duration})

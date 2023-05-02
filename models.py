@@ -1,6 +1,8 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import sessionmaker, scoped_session
 
 db = SQLAlchemy()
+Session = scoped_session(sessionmaker())
 
 
 class Snippet(db.Model):
