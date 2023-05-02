@@ -102,14 +102,14 @@ def process_youtube_link(url):
     filename = uuid.uuid4()
     ydl_opts = {
         "format": "mp3/bestaudio/best",
-        'outtmpl': f'{Config.TMP_DIRECTORY}/{filename}.%(ext)s',
+        "outtmpl": f"{Config.TMP_DIRECTORY}/{filename}.%(ext)s",
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
             }
         ],
-        'writeinfojson': True,
+        "writeinfojson": True,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -120,9 +120,7 @@ def process_youtube_link(url):
     audio_filepath = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
     thumbnail = info_dict.get("thumbnail", "")
     time = get_time_from_url(url)
-    source = add_source(
-        url, title=title, thumbnail=thumbnail, provider="youtube"
-    )
+    source = add_source(url, title=title, thumbnail=thumbnail, provider="youtube")
     return source, audio_filepath, time
 
 
