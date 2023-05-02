@@ -7,7 +7,7 @@ from pydub import AudioSegment
 from config import Config
 
 
-def delete_oldest_file(size_threshold=Config.TMP_MAX_SIZE, dir="./tmp"):
+def delete_oldest_file(size_threshold=Config.TMP_MAX_SIZE, dir=Config.TMP_DIRECTORY):
     directory_size = 0
     for f in os.listdir(dir):
         directory_size += os.path.getsize(os.path.join(dir, f))
@@ -20,7 +20,7 @@ def delete_oldest_file(size_threshold=Config.TMP_MAX_SIZE, dir="./tmp"):
     os.remove(os.path.join(dir, oldest_file))
 
 
-def download_file(url, directory="./tmp", filename=None):
+def download_file(url, directory=Config.TMP_DIRECTORY, filename=None):
     delete_oldest_file()
 
     r = requests.get(url)
@@ -52,3 +52,8 @@ def create_wav_clip(filepath, seconds_location, duration):
     clip_wav = os.path.splitext(filepath)[0] + ".wav"
     clip.export(clip_wav, format="wav")
     return clip_wav
+
+
+def cleanup_tmp_files():
+    for f in os.listdir(Config.TMP_DIRECTORY):
+        os.remove(os.path.join(Config.TMP_DIRECTORY, f))

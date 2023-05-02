@@ -1,16 +1,18 @@
-import os
 import re
 from urllib.parse import parse_qs, urlparse
 
-import pytube
+import yt_dlp
 import requests
 import speech_recognition as sr
 from bs4 import BeautifulSoup
 
 from models import Snippet, Source, db
 from services import files
+from config import Config
 
 r = sr.Recognizer()
+
+# TODO Implement a queue so that multiple requests can be processed sequentially
 
 
 def get_time_from_url(url):
@@ -92,18 +94,32 @@ def process_url(url, user_id, time, duration):
         source = add_source(url, title=title, thumbnail=thumbnail_path)
 
     add_snippet(audio_filepath, time, duration, source, user_id)
+    files.cleanup_tmp_files()
 
 
 def process_youtube_link(url):
-    yt = pytube.YouTube(url, use_oauth=True, allow_oauth_cache=True)
-    audio_stream = yt.streams.filter(only_audio=True).first()
-    audio_stream.download(output_path="./tmp", filename=audio_stream.default_filename)
-    audio_filepath = os.path.join("./tmp", audio_stream.default_filename)
-    title = yt.title
+    ydl_opts = {
+        "format": "mp3/bestaudio/best",
+        'outtmpl': f'{Config.TMP_DIRECTORY}/%(title)s.%(ext)s',
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+            }
+        ],
+        'writeinfojson': True,
+    }
 
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info_dict = ydl.extract_info(url, download=False)
+        ydl.download([url])
+
+    title = info_dict.get("title", "")
+    audio_filepath = f"{Config.TMP_DIRECTORY}/{title}.mp3"
+    thumbnail = info_dict.get("thumbnail", "")
     time = get_time_from_url(url)
     source = add_source(
-        url, title=title, thumbnail=yt.thumbnail_url, provider="youtube"
+        url, title=title, thumbnail=thumbnail, provider="youtube"
     )
     return source, audio_filepath, time
 

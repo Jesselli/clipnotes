@@ -12,4 +12,4 @@ if __name__ == "__main__":
     app.register_blueprint(blueprint)
     db.init_app(app)
     jinja_partials.register_extensions(app)
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)
