@@ -9,6 +9,7 @@ colorama==0.4.6
 ffmpeg-python==0.2.0
 filelock==3.12.0
 Flask==2.3.2
+Flask-Cors==3.0.10
 Flask-SQLAlchemy==3.0.3
 future==0.18.3
 greenlet==2.0.2

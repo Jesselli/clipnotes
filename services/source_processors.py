@@ -140,8 +140,7 @@ def process_pocketcast_link(url):
 
 def process_queue():
     while True:
-        task = queue.get()
-        if task:
+        if task := queue.get():
             process_url(task["url"], task["user_id"], task["time"], task["duration"])
             queue.task_done()
 

@@ -1,5 +1,8 @@
-from flask import request, Blueprint, render_template
-from models import Source, Snippet, Session
+from datetime import datetime
+
+from flask import request, Blueprint, render_template, jsonify
+from models import Source, Snippet, SyncRecord, Session
+from sqlalchemy import and_
 
 from services import source_processors
 from services import snippet_db
@@ -18,15 +21,60 @@ def index():
 
 
 @blueprint.get("/source/<int:source_id>/markdown")
-def source_to_markdown(source_id):
+def get_source_markdown(source_id):
+    # TODO Look into better ways of parsing requests -- reqparse? Marshmallow?
+    exclusions = request.args.get("exclude", [])
+    get_latest = request.args.get("latest", False)
+    # TODO: This is ugly. Shouldn't mutate types.
+    if str(get_latest).lower() == "true":
+        get_latest = True
+    elif str(get_latest).lower() == "false":
+        get_latest = False
+
+    since = datetime.min
+    if get_latest:
+        since = get_sync_record(source_id).synced_at
+        print(since)
+
     source = Session.query(Source).get(source_id)
-    snippets = Session.query(Snippet).filter_by(source_id=source_id).all()
-    markdown = f"# {source.title}\n\n"
-    markdown += f"![thumbnail]({source.thumb_url})\n\n"
-    markdown += f"[{source.title}]({source.url})\n\n"
+    filter = and_(Snippet.source_id == source_id, Snippet.created_at > since)
+    snippets = Session.query(Snippet).filter(filter).all()
+    markdown = ""
+    if not get_latest and "title" not in exclusions:
+        markdown = f"# {source.title}\n\n"
+    if not get_latest and "thumbnail" not in exclusions:
+        markdown += f"![thumbnail]({source.thumb_url})\n\n"
+    if not get_latest:
+        markdown += f"[{source.title}]({source.url})\n\n"
     for snippet in snippets:
         markdown += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
     return markdown
+
+
+@blueprint.post('/source/<int:source_id>/sync')
+def create_sync_record(source_id):
+    # TODO Add support for multiple users
+    user_id = 1
+    sync_record = SyncRecord(user_id=user_id, source_id=source_id)
+    Session.add(sync_record)
+    Session.commit()
+    return jsonify(sync_record)
+
+
+# TODO: Move this to a service file
+def get_sync_record(source_id):
+    # TODO Add support for multiple users
+    user_id = 1
+    sync_record = Session.query(SyncRecord).filter_by(user_id=user_id, source_id=source_id).first()
+    return sync_record
+
+
+@blueprint.get("/sources")
+def get_sources():
+    # TODO Add support for multiple users
+    user_id = 1
+    sources = snippet_db.get_sources(user_id)
+    return jsonify(sources)
 
 
 @blueprint.delete("/source/<int:source_id>")
