@@ -117,6 +117,10 @@ def process_youtube_link(url):
         ydl.download([url])
 
     title = info_dict.get("title", "")
+    # TODO: Use subtitles if avaialble, instead of audio
+    # TODO: Include option to use automatic_captions
+    # TODO: Include tags if available
+    # TODO: Include source name (Veritasium, Daily Stoic, etc.)
     audio_filepath = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
     thumbnail = info_dict.get("thumbnail", "")
     time = get_time_from_url(url)

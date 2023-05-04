@@ -7,22 +7,7 @@ from pydub import AudioSegment
 from config import Config
 
 
-def delete_oldest_file(size_threshold=Config.TMP_MAX_SIZE, dir=Config.TMP_DIRECTORY):
-    directory_size = 0
-    for f in os.listdir(dir):
-        directory_size += os.path.getsize(os.path.join(dir, f))
-
-    if directory_size < size_threshold:
-        return
-
-    files = os.listdir(dir)
-    oldest_file = min(files, key=os.path.getctime)
-    os.remove(os.path.join(dir, oldest_file))
-
-
 def download_file(url, directory=Config.TMP_DIRECTORY, filename=None):
-    delete_oldest_file()
-
     r = requests.get(url)
     parsed_url = urlparse(url)
 

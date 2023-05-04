@@ -32,9 +32,8 @@ def get_source_markdown(source_id):
         get_latest = False
 
     since = datetime.min
-    if get_latest:
-        since = get_sync_record(source_id).synced_at
-        print(since)
+    if get_latest and (sync_record := get_sync_record(source_id)):
+        since = sync_record.synced_at
 
     source = Session.query(Source).get(source_id)
     filter = and_(Snippet.source_id == source_id, Snippet.created_at > since)
@@ -54,6 +53,7 @@ def get_source_markdown(source_id):
 @blueprint.post('/source/<int:source_id>/sync')
 def create_sync_record(source_id):
     # TODO Add support for multiple users
+    # TODO Update existing sync record if it exists and return the appropriate status code
     user_id = 1
     sync_record = SyncRecord(user_id=user_id, source_id=source_id)
     Session.add(sync_record)
@@ -65,7 +65,7 @@ def create_sync_record(source_id):
 def get_sync_record(source_id):
     # TODO Add support for multiple users
     user_id = 1
-    sync_record = Session.query(SyncRecord).filter_by(user_id=user_id, source_id=source_id).first()
+    sync_record = Session.query(SyncRecord).filter_by(user_id=user_id, source_id=source_id).order_by(SyncRecord.synced_at.desc()).first()
     return sync_record
 
 
