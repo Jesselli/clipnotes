@@ -7,32 +7,42 @@
     <link rel="stylesheet" href="/static/css/bootstrap.min.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="/static/fontawesome/css/all.min.css" crossorigin="anonymous" />
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/htmx.min.js"></script>
+    <script>
+        function copyToClipboard(id) {
+            const toastLiveExample = document.getElementById('liveToast')
+            const toastBootstrap = bootstrap.Toast.getOrCreateInstance(toastLiveExample)
+            toastBootstrap.show()
+
+            var text = fetch("/source/" + id + "/markdown")
+                .then(response => response.text())
+                .then(text => {
+                    navigator.clipboard.writeText(text)
+                })
+        }
+    </script>
     {% block additional_css %}{% endblock %}
 </head>
 
 <body style="padding-top: 100px;">
-    <nav class="navbar fixed-top bg-dark bg-body-tertiary" data-bs-theme="dark">
+    <nav class="navbar navbar-expand-lg fixed-top bg-dark bg-body-tertiary" data-bs-theme="dark">
         <div class="container-fluid">
             <a class="navbar-brand fs-2" href="#">
                 <i class="fa-solid fa-scissors pe-2"></i>
                 ClipNotes
             </a>
-            <form hx-post="/snippets" hx-target="#sources" hx-indicator=".htmx-indicator">
-                <div class="row">
-                    <div class="col-auto">
-                        <div class="input-group">
-                            <span class="input-group-text">Source</span>
-                            <input name="url" type="text" class="form-control" placeholder="url" style="width:300px;">
-                            <span class="input-group-text">Duration</span>
-                            <input name="duration" type="text" class="form-control" value="60" style="width:60px;">
-                            <button class="btn btn-outline-success" type="submit">Add</button>
-                        </div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fa-solid fa-gear fa-spin fa-xl mt-3 htmx-indicator" style="color:white;"></i>
-                    </div>
-                </div>
-            </form>
+            {% if current_user.is_authenticated %}
+            <div class="dropdown">
+                <i class="fa-solid fa-user text-light fa-xl dropdown-toggle redhover" data-bs-toggle="dropdown"></i>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><p class="dropdown-header">{{current_user.email}}</p></li>
+                    <li><a class="dropdown-item" href="/logout">Logout</a></li>
+                    <!-- <li><a class="dropdown-item" href="#">Another action</a></li> -->
+                    <!-- <li><a class="dropdown-item" href="#">Something else here</a></li> -->
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </nav>
     <div class="container">
@@ -50,21 +60,6 @@
                 aria-label="Close"></button>
         </div>
     </div>
-    <script src="/static/js/bootstrap.min.js"></script>
-    <script src="/static/js/htmx.min.js"></script>
-    <script>
-        function copyToClipboard(id) {
-            const toastLiveExample = document.getElementById('liveToast')
-            const toastBootstrap = bootstrap.Toast.getOrCreateInstance(toastLiveExample)
-            toastBootstrap.show()
-
-            var text = fetch("/source/" + id + "/markdown")
-                .then(response => response.text())
-                .then(text => {
-                    navigator.clipboard.writeText(text)
-                })
-        }
-    </script>
 </body>
 
 </html>

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 db = SQLAlchemy()
@@ -48,6 +49,20 @@ class Source(db.Model):
     def __repr__(self):
         return f"<Source {self.id} - {self.title}>"
 
+    @staticmethod
+    def get_sources_and_snippets(user_id):
+        sources = (
+            Session
+            .query(Source)
+            .join(Snippet)
+            .filter(Snippet.user_id == user_id)
+            .order_by(Snippet.created_at.desc())
+            .all()
+        )
+        for source in sources:
+            source.snippets.sort(key=lambda x: x.time, reverse=False)
+        return sources
+
 
 @dataclass
 class SyncRecord(db.Model):
@@ -63,12 +78,26 @@ class SyncRecord(db.Model):
 
 
 @dataclass
-class User(db.Model):
+class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    first_name = db.Column(db.String(255))
-    last_name = db.Column(db.String(255))
     email = db.Column(db.String(255), unique=True)
+    password = db.Column(db.String(255))
     snippets = db.relationship("Snippet", backref="user")
 
     def __repr__(self):
         return f"<User {self.id} - {self.name}>"
+
+    @staticmethod
+    def create(email, password):
+        user = User(email=email, password=password)
+        Session.add(user)
+        Session.commit()
+        return user
+    
+    @staticmethod
+    def get_by_email(email):
+        return Session.query(User).filter_by(email=email).first()
+    
+    @staticmethod
+    def get_by_id(user_id):
+        return Session.query(User).get(user_id)

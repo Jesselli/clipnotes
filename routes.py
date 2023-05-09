@@ -1,23 +1,61 @@
 from datetime import datetime
 
-from flask import request, Blueprint, render_template, jsonify
-from models import Source, Snippet, SyncRecord, Session
+from flask import request, Blueprint, render_template, jsonify, redirect
+from models import Source, Snippet, User, SyncRecord, Session
 from sqlalchemy import and_
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import login_required, login_user, logout_user, current_user
 
 from services import source_processors
-from services import snippet_db
 
 blueprint = Blueprint("test", __name__)
 
 # TODO: Separate out the api from the rest of the app
 
 
+@blueprint.get("/register")
+def register():
+    return render_template("register.html")
+
+
+@blueprint.get("/login")
+def login():
+    return render_template("login.html")
+
+
+@blueprint.get("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect("/login")
+
+
 @blueprint.get("/")
+@login_required
 def index():
-    # TODO Add support for multiple users
-    user_id = 1
-    sources = snippet_db.get_sources(user_id)
+    sources = Source.get_sources_and_snippets(current_user.id)
     return render_template("index.html", sources=sources)
+
+
+@blueprint.post("/login")
+def login_post():
+    if request.form:
+        username = request.form["email"]
+        password = request.form["password"]
+        user = Session.query(User).filter_by(email=username).first()
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            return redirect("/")
+    return "Invalid credentials", 401
+
+
+@blueprint.post("/register")
+def register_user():
+    if request.form:
+        username = request.form["email"]
+        password_hash = generate_password_hash(request.form["password"])
+        User.create(username, password_hash)
+    return "Registered", 200
 
 
 @blueprint.get("/source/<int:source_id>/markdown")
@@ -73,7 +111,7 @@ def get_sync_record(source_id):
 def get_sources():
     # TODO Add support for multiple users
     user_id = 1
-    sources = snippet_db.get_sources(user_id)
+    sources = Source.get_sources_and_snippets(user_id)
     return jsonify(sources)
 
 
@@ -94,11 +132,12 @@ def create_snippet():
     url = request.form.get("url")
     duration = request.form.get("duration", 60, type=int)
     time = request.form.get("time", 0)
-    # TODO: Add support for other users
-    user_id = 1
-    source_processors.process_url(url, user_id, time, duration)
-    sources = snippet_db.get_sources(user_id)
-    return render_template("partials/sources.html", sources=sources)
+    if current_user and current_user.is_authenticated:
+        source_processors.process_url(url, current_user.id, time, duration)
+        sources = Source.get_sources_and_snippets(current_user.id)
+        return render_template("partials/sources.html", sources=sources)
+    else:
+        return "Not authenticated"
 
 
 @blueprint.post("/snippet/enqueue")

@@ -1,5 +1,6 @@
 class Config:
-    # TODO Set a secret key for the app
+    # TODO Obviously this is not secure
+    SECRET_KEY = "tempsecretkey"
     SQLALCHEMY_DATABASE_URI = "sqlite:///snippets.sqlite3"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     TMP_DIRECTORY = "./tmp"
