@@ -64,8 +64,7 @@ def add_source(url, title=None, thumbnail=None, provider=None):
         source = existing_source
     else:
         source = Source(url=url, title=title, thumb_url=thumbnail, provider=provider)
-        Session.add(source)
-        Session.commit()
+        source.add_to_db()
     return source
 
 
@@ -76,8 +75,7 @@ def add_snippet(audio_filepath, time, duration, source, user_id):
     snippet = Snippet(
         source_id=source.id, user_id=user_id, time=seconds, duration=duration, text=text
     )
-    Session.add(snippet)
-    Session.commit()
+    snippet.add_to_db()
 
     return text
 

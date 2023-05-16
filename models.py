@@ -1,3 +1,5 @@
+import uuid
+
 from dataclasses import dataclass
 
 from flask_sqlalchemy import SQLAlchemy
@@ -29,6 +31,22 @@ class Snippet(db.Model):
     def __repr__(self):
         return f"<Snippet {self.id} - {self.text}>"
 
+    # TODO Be consistent -- we should probably just use normal methods instead of classmethods
+    @classmethod
+    def update_text_in_db(cls, snippet_id, text):
+        Session.query(Snippet).filter_by(id=snippet_id).update({"text": text})
+        Session.commit()
+
+    @classmethod
+    def delete_from_db(cls, snippet_id):
+        Session.query(Snippet).filter_by(id=snippet_id).delete()
+        Session.commit()
+
+    # TODO Be consistent -- add_to_db or _save_to_db?
+    def add_to_db(self):
+        Session.add(self)
+        Session.commit()
+
 
 @dataclass
 class Source(db.Model):
@@ -49,11 +67,10 @@ class Source(db.Model):
     def __repr__(self):
         return f"<Source {self.id} - {self.title}>"
 
-    @staticmethod
-    def get_sources_and_snippets(user_id):
+    @classmethod
+    def get_sources_and_snippets(cls, user_id):
         sources = (
-            Session
-            .query(Source)
+            Session.query(Source)
             .join(Snippet)
             .filter(Snippet.user_id == user_id)
             .order_by(Snippet.created_at.desc())
@@ -62,6 +79,14 @@ class Source(db.Model):
         for source in sources:
             source.snippets.sort(key=lambda x: x.time, reverse=False)
         return sources
+
+    def delete_from_db(self):
+        Session.delete(self)
+        Session.commit()
+
+    def add_to_db(self):
+        Session.add(self)
+        Session.commit()
 
 
 @dataclass
@@ -76,6 +101,10 @@ class SyncRecord(db.Model):
     source_id = db.Column(db.Integer, db.ForeignKey("source.id"), nullable=False)
     synced_at = db.Column(db.DateTime, default=db.func.now())
 
+    def add_to_db(self):
+        Session.add(self)
+        Session.commit()
+
 
 @dataclass
 class User(UserMixin, db.Model):
@@ -83,21 +112,46 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(255), unique=True)
     password = db.Column(db.String(255))
     snippets = db.relationship("Snippet", backref="user")
+    devices = db.relationship("Device", backref="user")
 
     def __repr__(self):
         return f"<User {self.id} - {self.name}>"
 
-    @staticmethod
-    def create(email, password):
+    @classmethod
+    def create(cls, email, password):
         user = User(email=email, password=password)
         Session.add(user)
         Session.commit()
         return user
-    
-    @staticmethod
-    def get_by_email(email):
+
+    @classmethod
+    def get_by_email(cls, email):
         return Session.query(User).filter_by(email=email).first()
-    
-    @staticmethod
-    def get_by_id(user_id):
+
+    @classmethod
+    def get_by_id(cls, user_id):
         return Session.query(User).get(user_id)
+
+
+class Device(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    device_name = db.Column(db.String(80), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    device_key = db.Column(db.String(80), default=uuid.uuid4().hex)
+
+    @classmethod
+    def find_by_name(cls, device_name):
+        return Session.query(Device).filter_by(device_name=device_name).first()
+
+    @classmethod
+    def find_devices_for_user(cls, user_id):
+        return Session.query(Device).filter_by(user_id=user_id).all()
+
+    # TODO Move these out to a parent class for all models?
+    def save_to_db(self):
+        Session.add(self)
+        Session.commit()
+
+    def delete_from_db(self):
+        Session.delete(self)
+        Session.commit()

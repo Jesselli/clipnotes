@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from flask import request, Blueprint, render_template, jsonify, redirect
-from models import Source, Snippet, User, SyncRecord, Session
+from models import Source, Snippet, User, SyncRecord, Device, Session
 from sqlalchemy import and_
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_required, login_user, logout_user, current_user
@@ -84,18 +84,17 @@ def get_source_markdown(source_id):
     if not get_latest:
         markdown += f"[{source.title}]({source.url})\n\n"
     for snippet in snippets:
-        markdown += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
+        markdown += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
     return markdown
 
 
-@blueprint.post('/source/<int:source_id>/sync')
+@blueprint.post("/source/<int:source_id>/sync")
 def create_sync_record(source_id):
     # TODO Add support for multiple users
     # TODO Update existing sync record if it exists and return the appropriate status code
     user_id = 1
     sync_record = SyncRecord(user_id=user_id, source_id=source_id)
-    Session.add(sync_record)
-    Session.commit()
+    sync_record.add_to_db()
     return jsonify(sync_record)
 
 
@@ -103,7 +102,12 @@ def create_sync_record(source_id):
 def get_sync_record(source_id):
     # TODO Add support for multiple users
     user_id = 1
-    sync_record = Session.query(SyncRecord).filter_by(user_id=user_id, source_id=source_id).order_by(SyncRecord.synced_at.desc()).first()
+    sync_record = (
+        Session.query(SyncRecord)
+        .filter_by(user_id=user_id, source_id=source_id)
+        .order_by(SyncRecord.synced_at.desc())
+        .first()
+    )
     return sync_record
 
 
@@ -121,8 +125,7 @@ def delete_source(source_id):
     for snippet in snippets:
         Session.delete(snippet)
     source = Session.query(Source).get(source_id)
-    Session.delete(source)
-    Session.commit()
+    source.delete_from_db()
     return ""
 
 
@@ -153,13 +156,35 @@ def enqueue_snippet():
 @blueprint.put("/snippet/<int:snippet_id>")
 def update_snippet(snippet_id):
     text = request.form.get("text")
-    Session.query(Snippet).filter_by(id=snippet_id).update({"text": text})
-    Session.commit()
+    Snippet.update_text_in_db(snippet_id, text)
     return text
 
 
 @blueprint.delete("/snippet/<int:snippet_id>")
 def delete_snippet(snippet_id):
-    Session.query(Snippet).filter_by(id=snippet_id).delete()
-    Session.commit()
+    Snippet.delete_from_db(snippet_id)
     return ""
+
+
+@blueprint.get("/devices")
+def get_devices():
+    devices = Device.find_devices_for_user(current_user.id)
+    return render_template("devices.html", devices=devices)
+
+
+@blueprint.post("/devices")
+def add_device():
+    # name = request.args.get("device_name")
+    name = request.form.get("device_name")
+    if Device.find_by_name(name):
+        return "Device already exists", 400
+
+    if current_user and current_user.is_authenticated:
+        new_device = Device(device_name=name, user_id=current_user.id)
+        new_device.save_to_db()
+    else:
+        # TODO: Remove. Obviously this is just a temporary measure to get started
+        new_device = Device(device_name=name, user_id=1)
+        new_device.save_to_db()
+
+    return "Created", 200
