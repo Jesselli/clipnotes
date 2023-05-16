@@ -105,6 +105,15 @@ class SyncRecord(db.Model):
         Session.add(self)
         Session.commit()
 
+    @classmethod
+    def get_user_sync_record(cls, source_id, user_id):
+        sync_record = (
+            Session.query(SyncRecord)
+            .filter_by(user_id=user_id, source_id=source_id)
+            .order_by(SyncRecord.synced_at.desc())
+            .first()
+        )
+        return sync_record
 
 @dataclass
 class User(UserMixin, db.Model):
@@ -146,6 +155,10 @@ class Device(db.Model):
     @classmethod
     def find_devices_for_user(cls, user_id):
         return Session.query(Device).filter_by(user_id=user_id).all()
+
+    @classmethod
+    def find_by_key(cls, device_key):
+        return Session.query(Device).filter_by(device_key=device_key).first()
 
     # TODO Move these out to a parent class for all models?
     def save_to_db(self):

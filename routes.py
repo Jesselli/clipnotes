@@ -9,6 +9,7 @@ from flask_login import login_required, login_user, logout_user, current_user
 from services import source_processors
 
 blueprint = Blueprint("test", __name__)
+api_blueprint = Blueprint("api", __name__, url_prefix="/api")
 
 # TODO: Separate out the api from the rest of the app
 
@@ -58,24 +59,14 @@ def register_user():
     return "Registered", 200
 
 
-@blueprint.get("/source/<int:source_id>/markdown")
-def get_source_markdown(source_id):
-    # TODO Look into better ways of parsing requests -- reqparse? Marshmallow?
-    exclusions = request.args.get("exclude", [])
-    get_latest = request.args.get("latest", False)
-    # TODO: This is ugly. Shouldn't mutate types.
-    if str(get_latest).lower() == "true":
-        get_latest = True
-    elif str(get_latest).lower() == "false":
-        get_latest = False
-
-    since = datetime.min
-    if get_latest and (sync_record := get_sync_record(source_id)):
-        since = sync_record.synced_at
-
+def get_markdown(source_id, user_id, exclusions=[], get_latest=False, since=datetime.min):
     source = Session.query(Source).get(source_id)
     filter = and_(Snippet.source_id == source_id, Snippet.created_at > since)
     snippets = Session.query(Snippet).filter(filter).all()
+
+    if get_latest and (sync_record := SyncRecord.get_user_sync_record(source_id, user_id)):
+        since = sync_record.synced_at
+
     markdown = ""
     if not get_latest and "title" not in exclusions:
         markdown = f"# {source.title}\n\n"
@@ -88,33 +79,37 @@ def get_source_markdown(source_id):
     return markdown
 
 
+@api_blueprint.get("/source/<int:source_id>/markdown")
+def api_get_source_markdown(source_id):
+    api_key = request.args.get("api_key")
+    user_id = Device.find_by_key(api_key).user_id
+    get_latest = request.args.get("get_latest", False)
+    since = request.args.get("since", datetime.min)
+    return get_markdown(source_id, user_id, get_latest=get_latest, since=since)
+
+
+@blueprint.get("/source/<int:source_id>/markdown")
+@login_required
+def get_source_markdown(source_id):
+    user_id = current_user.id
+    return get_markdown(source_id, user_id)
+
 @blueprint.post("/source/<int:source_id>/sync")
 def create_sync_record(source_id):
-    # TODO Add support for multiple users
     # TODO Update existing sync record if it exists and return the appropriate status code
-    user_id = 1
+    api_key = request.form.get("api_key")
+    user_id = Device.find_by_key(api_key).user_id
     sync_record = SyncRecord(user_id=user_id, source_id=source_id)
     sync_record.add_to_db()
     return jsonify(sync_record)
 
 
-# TODO: Move this to a service file
-def get_sync_record(source_id):
-    # TODO Add support for multiple users
-    user_id = 1
-    sync_record = (
-        Session.query(SyncRecord)
-        .filter_by(user_id=user_id, source_id=source_id)
-        .order_by(SyncRecord.synced_at.desc())
-        .first()
-    )
-    return sync_record
-
-
+# TODO: This should be an api endpoint
 @blueprint.get("/sources")
 def get_sources():
-    # TODO Add support for multiple users
-    user_id = 1
+    # TODO Better parsing of args -- failure states
+    api_key = request.args.get("api_key")
+    user_id = Device.find_by_key(api_key).user_id
     sources = Source.get_sources_and_snippets(user_id)
     return jsonify(sources)
 
@@ -167,24 +162,24 @@ def delete_snippet(snippet_id):
 
 
 @blueprint.get("/devices")
+@login_required
 def get_devices():
-    devices = Device.find_devices_for_user(current_user.id)
+    if current_user and current_user.is_authenticated:
+        user_id = current_user.id
+
+    devices = Device.find_devices_for_user(user_id)
     return render_template("devices.html", devices=devices)
 
 
 @blueprint.post("/devices")
 def add_device():
-    # name = request.args.get("device_name")
-    name = request.form.get("device_name")
+    if request.form:
+        name = request.form.get("device_name")
     if Device.find_by_name(name):
         return "Device already exists", 400
 
     if current_user and current_user.is_authenticated:
         new_device = Device(device_name=name, user_id=current_user.id)
-        new_device.save_to_db()
-    else:
-        # TODO: Remove. Obviously this is just a temporary measure to get started
-        new_device = Device(device_name=name, user_id=1)
         new_device.save_to_db()
 
     return "Created", 200
