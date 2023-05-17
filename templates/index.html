@@ -1,7 +1,7 @@
 {% extends "shared/_layout.html" %}
 {% block main_content %}
 <div class="card mb-5">
-    <h5 class="card-header">Add a snippet</h5>
+    <h5 class="card-header">Add a clip</h5>
     <div class="card-body">
         <form hx-post="/snippets" hx-target="#sources" hx-indicator=".htmx-indicator">
             <div class="row align-items-end">
@@ -15,7 +15,8 @@
                 </div>
                 <div class="col-2">
                     <button class="btn btn-outline-success" type="submit">Add</button>
-                    <i class="fa-solid fa-gear fa-spin fa-xl htmx-indicator" style="position:relative; top:1px; left:10px"></i>
+                    <i class="fa-solid fa-gear fa-spin fa-xl me-3 htmx-indicator" style="position:relative; top:1px; left:10px"></i>
+                    <span class="htmx-indicator">Processing!</span>
                 </div>
             </div>
         </form>
@@ -25,24 +26,5 @@
 {% endblock %}
 
 {% block additional_css %}
-<style>
-    .redhover {
-        transition: all .2s ease-in-out;
-    }
-    
-    .redhover:hover {
-        /* transform: scale(1.2);  */
-        color: red;
-    }
 
-    div.source.htmx-swapping {
-        opacity: 0;
-        transition: opacity 0.25s ease-out;
-    }
-
-    div.snippet.htmx-swapping {
-        opacity: 0;
-        transition: opacity 0.25s ease-out;
-    }
-</style>
 {% endblock %}

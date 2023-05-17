@@ -1,5 +1,3 @@
-import uuid
-
 from dataclasses import dataclass
 
 from flask_sqlalchemy import SQLAlchemy
@@ -10,8 +8,18 @@ db = SQLAlchemy()
 Session = scoped_session(sessionmaker())
 
 
+class BaseModel:
+    def add_to_db(self):
+        Session.add(self)
+        Session.commit()
+
+    def delete_from_db(self):
+        Session.delete(self)
+        Session.commit()
+
+
 @dataclass
-class Snippet(db.Model):
+class Snippet(db.Model, BaseModel):
     id: int
     user_id: int
     source_id: int
@@ -31,25 +39,17 @@ class Snippet(db.Model):
     def __repr__(self):
         return f"<Snippet {self.id} - {self.text}>"
 
-    # TODO Be consistent -- we should probably just use normal methods instead of classmethods
     @classmethod
-    def update_text_in_db(cls, snippet_id, text):
-        Session.query(Snippet).filter_by(id=snippet_id).update({"text": text})
-        Session.commit()
+    def find_by_id(cls, snippet_id):
+        return Session.query(Snippet).filter_by(id=snippet_id).first()
 
-    @classmethod
-    def delete_from_db(cls, snippet_id):
-        Session.query(Snippet).filter_by(id=snippet_id).delete()
-        Session.commit()
-
-    # TODO Be consistent -- add_to_db or _save_to_db?
-    def add_to_db(self):
-        Session.add(self)
+    def update_text_in_db(self, text):
+        self.text = text
         Session.commit()
 
 
 @dataclass
-class Source(db.Model):
+class Source(db.Model, BaseModel):
     id: int
     url: str
     title: str
@@ -80,17 +80,9 @@ class Source(db.Model):
             source.snippets.sort(key=lambda x: x.time, reverse=False)
         return sources
 
-    def delete_from_db(self):
-        Session.delete(self)
-        Session.commit()
-
-    def add_to_db(self):
-        Session.add(self)
-        Session.commit()
-
 
 @dataclass
-class SyncRecord(db.Model):
+class SyncRecord(db.Model, BaseModel):
     id: int
     user_id: int
     source_id: int
@@ -100,10 +92,6 @@ class SyncRecord(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     source_id = db.Column(db.Integer, db.ForeignKey("source.id"), nullable=False)
     synced_at = db.Column(db.DateTime, default=db.func.now())
-
-    def add_to_db(self):
-        Session.add(self)
-        Session.commit()
 
     @classmethod
     def get_user_sync_record(cls, source_id, user_id):
@@ -115,8 +103,9 @@ class SyncRecord(db.Model):
         )
         return sync_record
 
+
 @dataclass
-class User(UserMixin, db.Model):
+class User(db.Model, UserMixin, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True)
     password = db.Column(db.String(255))
@@ -142,11 +131,11 @@ class User(UserMixin, db.Model):
         return Session.query(User).get(user_id)
 
 
-class Device(db.Model):
+class Device(db.Model, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     device_name = db.Column(db.String(80), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    device_key = db.Column(db.String(80), default=uuid.uuid4().hex)
+    device_key = db.Column(db.String(80), nullable=False)
 
     @classmethod
     def find_by_name(cls, device_name):
@@ -160,11 +149,6 @@ class Device(db.Model):
     def find_by_key(cls, device_key):
         return Session.query(Device).filter_by(device_key=device_key).first()
 
-    # TODO Move these out to a parent class for all models?
-    def save_to_db(self):
-        Session.add(self)
-        Session.commit()
-
-    def delete_from_db(self):
-        Session.delete(self)
-        Session.commit()
+    @classmethod
+    def find_by_id(cls, device_id):
+        return Session.query(Device).get(device_id)

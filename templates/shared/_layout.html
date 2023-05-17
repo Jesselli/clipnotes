@@ -22,6 +22,26 @@
                 })
         }
     </script>
+    <style>
+        .redhover {
+            transition: all .2s ease-in-out;
+        }
+
+        .redhover:hover {
+            /* transform: scale(1.2);  */
+            color: red;
+        }
+
+        div.source.htmx-swapping {
+            opacity: 0;
+            transition: opacity 0.25s ease-out;
+        }
+
+        div.snippet.htmx-swapping {
+            opacity: 0;
+            transition: opacity 0.25s ease-out;
+        }
+    </style>
     {% block additional_css %}{% endblock %}
 </head>
 
@@ -39,8 +59,9 @@
                     <li>
                         <p class="dropdown-header">{{current_user.email}}</p>
                     </li>
-                    <li><a class="dropdown-item" href="/logout">Logout</a></li>
+                    <li><a class="dropdown-item" href="/">My clips</a></li>
                     <li><a class="dropdown-item" href="/devices">API Keys</a></li>
+                    <li><a class="dropdown-item" href="/logout">Logout</a></li>
                 </ul>
             </div>
             {% endif %}
