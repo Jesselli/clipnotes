@@ -123,7 +123,7 @@ class User(db.Model, UserMixin, BaseModel):
         return user
 
     @classmethod
-    def get_by_email(cls, email):
+    def find_by_email(cls, email):
         return Session.query(User).filter_by(email=email).first()
 
     @classmethod

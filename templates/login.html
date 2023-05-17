@@ -2,15 +2,8 @@
 {% block main_content %}
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-4 offset-md-4 mt-5">
-            <div class="card">
-                <div class="card-header">
-                    <h1 class="text-center">Login</h1>
-                </div>
-                <div class="card-body">
-                    {{ render_partial('partials/login_form.html') }}
-                </div>
-            </div>
+        <div class="col-md-4 offset-md-4 mt-5" id="form-container">
+            {{ render_partial('partials/login_form.html') }}
         </div>
     </div>
 </div>

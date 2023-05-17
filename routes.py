@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from flask import request, Blueprint, render_template, jsonify, redirect, Response
+from flask import request, Blueprint, render_template, jsonify, redirect, Response, flash
 from models import Source, Snippet, User, SyncRecord, Device, Session
 from sqlalchemy import and_
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -48,16 +48,37 @@ def login_post():
             response = Response("Logged in", 200)
             response.headers["HX-Redirect"] = "/"
             return response
-    return render_template("partials/login_form.html", message="Invalid credentials")
+    return render_template(
+        "partials/login_form.html", message="Invalid credentials.", style="danger"
+    )
 
 
 @main.post("/register")
 def register_user():
-    if request.form:
-        username = request.form["email"]
-        password_hash = generate_password_hash(request.form["password"])
-        User.create(username, password_hash)
-    return "Registered", 200
+    password = request.form["password"]
+    password_confirmation = request.form["confirm_password"]
+    if password != password_confirmation:
+        return render_template(
+            "partials/register_form.html",
+            message="Passwords do not match.",
+            style="danger",
+        )
+    email = request.form["email"]
+    password_hash = generate_password_hash(password)
+
+    user = User.find_by_email(email)
+    if user:
+        return render_template(
+            "partials/register_form.html",
+            message="User already exists.",
+            style="danger",
+        )
+
+    User.create(email, password_hash)
+    flash("User created. Please login.", "success")
+    response = Response("success", 200)
+    response.headers["HX-Redirect"] = "/login"
+    return response
 
 
 # TODO: Move this to a service
@@ -156,7 +177,9 @@ def add_device():
 
     if current_user and current_user.is_authenticated:
         device_key = uuid.uuid4().hex
-        new_device = Device(device_name=name, user_id=current_user.id, device_key=device_key)
+        new_device = Device(
+            device_name=name, user_id=current_user.id, device_key=device_key
+        )
         new_device.add_to_db()
 
     devices = Device.find_devices_for_user(current_user.id)
