@@ -207,11 +207,14 @@ def api_get_source_markdown(source_id):
 
 @api.post("/source/<int:source_id>/sync")
 def create_sync_record(source_id):
-    # TODO Update existing sync record if it exists and return the appropriate status code
     api_key = request.form.get("api_key")
     user_id = Device.find_by_key(api_key).user_id
-    sync_record = SyncRecord(user_id=user_id, source_id=source_id)
-    sync_record.add_to_db()
+    sync_record = SyncRecord.find_by_user_source(user_id, source_id)
+    if sync_record:
+        sync_record.update_sync_time()
+    else:
+        sync_record = SyncRecord(user_id=user_id, source_id=source_id)
+        sync_record.add_to_db()
     return jsonify(sync_record)
 
 

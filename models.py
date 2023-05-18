@@ -9,6 +9,8 @@ Session = scoped_session(sessionmaker())
 
 
 class BaseModel:
+    __allow_unmapped__ = True
+
     def add_to_db(self):
         Session.add(self)
         Session.commit()
@@ -103,6 +105,17 @@ class SyncRecord(db.Model, BaseModel):
         )
         return sync_record
 
+    @classmethod
+    def find_by_user_source(cls, user_id, source_id):
+        return (
+            Session.query(SyncRecord)
+            .filter_by(user_id=user_id, source_id=source_id)
+            .first()
+        )
+
+    def update_sync_time(self, time=db.func.now()):
+        self.synced_at = time
+        Session.commit()
 
 @dataclass
 class User(db.Model, UserMixin, BaseModel):

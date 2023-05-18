@@ -10,6 +10,7 @@ ffmpeg-python==0.2.0
 filelock==3.12.0
 Flask==2.3.2
 Flask-Cors==3.0.10
+Flask-Login==0.6.2
 Flask-SQLAlchemy==3.0.3
 future==0.18.3
 greenlet==2.0.2
@@ -31,6 +32,7 @@ pycryptodomex==3.17
 pydub==0.25.1
 regex==2023.3.23
 requests==2.29.0
+six==1.16.0
 soundfile==0.12.1
 soupsieve==2.4.1
 SpeechRecognition==3.10.0
