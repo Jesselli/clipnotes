@@ -10,4 +10,5 @@ requests
 soundfile
 SpeechRecognition
 SQLAlchemy
+waitress
 yt-dlp

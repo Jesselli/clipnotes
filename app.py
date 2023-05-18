@@ -1,13 +1,14 @@
 from threading import Thread
+
 import jinja_partials
 from flask import Flask
 from flask_cors import CORS
 from flask_login import LoginManager
 from sqlalchemy import create_engine
 
-from models import db, Session, User
-from routes import main, api
 from config import Config
+from models import Session, User, db
+from routes import api, main
 from services import source_processors
 
 app = Flask(__name__)
@@ -21,7 +22,7 @@ def create_db():
     db.create_all()
 
 
-if __name__ == "__main__":
+def create_app():
     queue_thread = Thread(target=source_processors.process_queue)
     queue_thread.daemon = True
     queue_thread.start()
@@ -41,4 +42,4 @@ if __name__ == "__main__":
     app.register_blueprint(api)
     db.init_app(app)
     jinja_partials.register_extensions(app)
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    return app
