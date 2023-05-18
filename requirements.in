@@ -1,0 +1,13 @@
+beautifulsoup4
+Flask
+Flask-Cors
+Flask-Login
+Flask-SQLAlchemy
+jinja-partials
+openai-whisper
+pydub
+requests
+soundfile
+SpeechRecognition
+SQLAlchemy
+yt-dlp
