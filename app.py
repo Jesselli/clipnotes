@@ -43,3 +43,9 @@ def create_app():
     db.init_app(app)
     jinja_partials.register_extensions(app)
     return app
+
+
+# TODO: Remove this eventually
+if __name__ == "__main__":
+    app = create_app()
+    app.run("0.0.0.0", debug=True)

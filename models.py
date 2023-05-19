@@ -117,6 +117,7 @@ class SyncRecord(db.Model, BaseModel):
         self.synced_at = time
         Session.commit()
 
+
 @dataclass
 class User(db.Model, UserMixin, BaseModel):
     id = db.Column(db.Integer, primary_key=True)

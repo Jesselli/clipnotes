@@ -1,7 +1,15 @@
 from datetime import datetime
 import uuid
 
-from flask import request, Blueprint, render_template, jsonify, redirect, Response, flash
+from flask import (
+    request,
+    Blueprint,
+    render_template,
+    jsonify,
+    redirect,
+    Response,
+    flash,
+)
 from models import Source, Snippet, User, SyncRecord, Device, Session
 from sqlalchemy import and_
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -82,23 +90,24 @@ def register_user():
 
 
 # TODO: Move this to a service
-def get_markdown(source_id, user_id, exclusions=[], latest=False, since=datetime.min):
+def get_markdown(source_id, user_id, exclusions=[], latest=False):
+    # TODO: Move this into models.py
     source = Session.query(Source).get(source_id)
+    since = datetime.min
+    if latest and (sync_record := SyncRecord.get_user_sync_record(source_id, user_id)):
+        since = sync_record.synced_at
     filter = and_(Snippet.source_id == source_id, Snippet.created_at > since)
     snippets = Session.query(Snippet).filter(filter).all()
 
-    if latest and (sync_record := SyncRecord.get_user_sync_record(source_id, user_id)):
-        since = sync_record.synced_at
-
     markdown = ""
-    if not latest and "title" not in exclusions:
+    if "title" not in exclusions:
         markdown = f"# {source.title}\n\n"
-    if not latest and "thumbnail" not in exclusions:
-        markdown += f"![thumbnail]({source.thumb_url})\n\n"
-    if not latest:
         markdown += f"[{source.title}]({source.url})\n\n"
+    if "thumbnail" not in exclusions:
+        markdown += f"![thumbnail]({source.thumb_url})\n\n"
     for snippet in snippets:
-        markdown += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
+        markdown += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
+    print(markdown)
     return markdown
 
 
@@ -198,16 +207,16 @@ def delete_device(device_id):
 
 @api.get("/source/<int:source_id>/markdown")
 def api_get_source_markdown(source_id):
-    api_key = request.args.get("api_key")
+    api_key = request.headers.get("X-Api-Key")
     user_id = Device.find_by_key(api_key).user_id
-    get_latest = request.args.get("get_latest", False)
-    since = request.args.get("since", datetime.min)
-    return get_markdown(source_id, user_id, get_latest=get_latest, since=since)
+    get_latest = request.args.get("latest", default=False, type=bool)
+    exclusions = request.args.get("exclude", [])
+    return get_markdown(source_id, user_id, latest=get_latest, exclusions=exclusions)
 
 
 @api.post("/source/<int:source_id>/sync")
 def create_sync_record(source_id):
-    api_key = request.form.get("api_key")
+    api_key = request.headers.get("X-Api-Key")
     user_id = Device.find_by_key(api_key).user_id
     sync_record = SyncRecord.find_by_user_source(user_id, source_id)
     if sync_record:
@@ -221,7 +230,7 @@ def create_sync_record(source_id):
 @api.get("/sources")
 def get_sources():
     # TODO Better parsing of args -- failure states
-    api_key = request.args.get("api_key")
+    api_key = request.headers.get("X-Api-Key")
     user_id = Device.find_by_key(api_key).user_id
     sources = Source.get_sources_and_snippets(user_id)
     return jsonify(sources)
