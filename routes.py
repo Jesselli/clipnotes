@@ -10,8 +10,7 @@ from flask import (
     Response,
     flash,
 )
-from models import Source, Snippet, User, SyncRecord, Device, Session
-from sqlalchemy import and_
+from models import Source, Snippet, User, SyncRecord, Device
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_required, login_user, logout_user, current_user
 
@@ -41,7 +40,7 @@ def logout():
 @main.get("/")
 @login_required
 def index():
-    sources = Source.get_sources_and_snippets(current_user.id)
+    sources = Source.get_user_sources_snippets(current_user.id)
     return render_template("index.html", sources=sources)
 
 
@@ -50,7 +49,7 @@ def login_post():
     if request.form:
         username = request.form["email"]
         password = request.form["password"]
-        user = Session.query(User).filter_by(email=username).first()
+        user = User.find_by_email(username)
         if user and check_password_hash(user.password, password):
             login_user(user)
             response = Response("Logged in", 200)
@@ -91,13 +90,11 @@ def register_user():
 
 # TODO: Move this to a service
 def get_markdown(source_id, user_id, exclusions=[], latest=False):
-    # TODO: Move this into models.py
-    source = Session.query(Source).get(source_id)
     since = datetime.min
     if latest and (sync_record := SyncRecord.get_user_sync_record(source_id, user_id)):
         since = sync_record.synced_at
-    filter = and_(Snippet.source_id == source_id, Snippet.created_at > since)
-    snippets = Session.query(Snippet).filter(filter).all()
+    source = Source.find_by_id(source_id)
+    snippets = Snippet.get_snippets_since(source_id, since)
 
     markdown = ""
     if "title" not in exclusions:
@@ -107,7 +104,7 @@ def get_markdown(source_id, user_id, exclusions=[], latest=False):
         markdown += f"![thumbnail]({source.thumb_url})\n\n"
     for snippet in snippets:
         markdown += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
-    print(markdown)
+
     return markdown
 
 
@@ -120,10 +117,10 @@ def get_source_markdown(source_id):
 
 @main.delete("/source/<int:source_id>")
 def delete_source(source_id):
-    snippets = Session.query(Snippet).filter_by(source_id=source_id).all()
+    source = Source.find_by_id(source_id)
+    snippets = source.snippets
     for snippet in snippets:
-        Session.delete(snippet)
-    source = Session.query(Source).get(source_id)
+        snippet.delete_from_db()
     source.delete_from_db()
     return ""
 
@@ -136,7 +133,7 @@ def create_snippet():
     time = request.form.get("time", 0)
     if current_user and current_user.is_authenticated:
         source_processors.process_url(url, current_user.id, time, duration)
-        sources = Source.get_sources_and_snippets(current_user.id)
+        sources = Source.get_user_sources_snippets(current_user.id)
         return render_template("partials/sources.html", sources=sources)
     else:
         return "Not authenticated"
@@ -232,5 +229,5 @@ def get_sources():
     # TODO Better parsing of args -- failure states
     api_key = request.headers.get("X-Api-Key")
     user_id = Device.find_by_key(api_key).user_id
-    sources = Source.get_sources_and_snippets(user_id)
+    sources = Source.get_user_sources_snippets(user_id)
     return jsonify(sources)

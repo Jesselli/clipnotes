@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy import and_
 
 db = SQLAlchemy()
 Session = scoped_session(sessionmaker())
@@ -45,6 +46,11 @@ class Snippet(db.Model, BaseModel):
     def find_by_id(cls, snippet_id):
         return Session.query(Snippet).filter_by(id=snippet_id).first()
 
+    @classmethod
+    def get_snippets_since(cls, source_id, since):
+        filter = and_(Snippet.source_id == source_id, Snippet.created_at > since)
+        return Session.query(Snippet).filter(filter).all()
+
     def update_text_in_db(self, text):
         self.text = text
         Session.commit()
@@ -70,7 +76,7 @@ class Source(db.Model, BaseModel):
         return f"<Source {self.id} - {self.title}>"
 
     @classmethod
-    def get_sources_and_snippets(cls, user_id):
+    def get_user_sources_snippets(cls, user_id):
         sources = (
             Session.query(Source)
             .join(Snippet)
@@ -81,6 +87,10 @@ class Source(db.Model, BaseModel):
         for source in sources:
             source.snippets.sort(key=lambda x: x.time, reverse=False)
         return sources
+
+    @classmethod
+    def find_by_id(cls, source_id):
+        return Session.query(Source).filter_by(id=source_id).first()
 
 
 @dataclass
