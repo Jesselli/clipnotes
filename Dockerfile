@@ -5,6 +5,6 @@ WORKDIR /app
 RUN pip install -r requirements.txt
 RUN apt update && apt install -y ffmpeg
 COPY . /app
-EXPOSE 8080
+RUN flask create-db
 ENTRYPOINT [ "waitress-serve" ]
-CMD [ "--call", "app:create_app" ]
+CMD [ "--call", "app:create_app"]

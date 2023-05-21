@@ -1,20 +1,20 @@
-from datetime import datetime
 import uuid
 
 from flask import (
-    request,
     Blueprint,
-    render_template,
-    jsonify,
-    redirect,
     Response,
     flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
 )
-from models import Source, Snippet, User, SyncRecord, Device
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import login_required, login_user, logout_user, current_user
+from flask_login import current_user, login_required, login_user, logout_user
+from werkzeug.security import check_password_hash, generate_password_hash
 
+from models import Device, Snippet, Source, SyncRecord, User
 from services import source_processors
+from services.markdown import generate_source_markdown
 
 main = Blueprint("main", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -55,9 +55,11 @@ def login_post():
             response = Response("Logged in", 200)
             response.headers["HX-Redirect"] = "/"
             return response
-    return render_template(
-        "partials/login_form.html", message="Invalid credentials.", style="danger"
-    )
+
+    style = "danger"
+    message = "Invalid credentials."
+    template = "partials/login_form.html"
+    return render_template(template, message=message, style=style)
 
 
 @main.post("/register")
@@ -65,21 +67,19 @@ def register_user():
     password = request.form["password"]
     password_confirmation = request.form["confirm_password"]
     if password != password_confirmation:
-        return render_template(
-            "partials/register_form.html",
-            message="Passwords do not match.",
-            style="danger",
-        )
+        style = "danger"
+        message = "Passwords do not match."
+        template = "partials/register_form.html"
+        return render_template(template, message=message, style=style)
     email = request.form["email"]
     password_hash = generate_password_hash(password)
 
     user = User.find_by_email(email)
     if user:
-        return render_template(
-            "partials/register_form.html",
-            message="User already exists.",
-            style="danger",
-        )
+        style = "danger"
+        message = "User already exists."
+        template = "partials/register_form.html"
+        return render_template(template, message=message, style=style)
 
     User.create(email, password_hash)
     flash("User created. Please login.", "success")
@@ -88,31 +88,11 @@ def register_user():
     return response
 
 
-# TODO: Move this to a service
-def get_markdown(source_id, user_id, exclusions=[], latest=False):
-    since = datetime.min
-    if latest and (sync_record := SyncRecord.get_user_sync_record(source_id, user_id)):
-        since = sync_record.synced_at
-    source = Source.find_by_id(source_id)
-    snippets = Snippet.get_snippets_since(source_id, since)
-
-    markdown = ""
-    if "title" not in exclusions:
-        markdown = f"# {source.title}\n\n"
-        markdown += f"[{source.title}]({source.url})\n\n"
-    if "thumbnail" not in exclusions:
-        markdown += f"![thumbnail]({source.thumb_url})\n\n"
-    for snippet in snippets:
-        markdown += f"{snippet.text.lstrip()} [{snippet.time}]({source.url}?t={snippet.time})\n\n"
-
-    return markdown
-
-
 @main.get("/source/<int:source_id>/markdown")
 @login_required
 def get_source_markdown(source_id):
     user_id = current_user.id
-    return get_markdown(source_id, user_id)
+    return generate_source_markdown(source_id, user_id)
 
 
 @main.delete("/source/<int:source_id>")
@@ -208,7 +188,9 @@ def api_get_source_markdown(source_id):
     user_id = Device.find_by_key(api_key).user_id
     get_latest = request.args.get("latest", default=False, type=bool)
     exclusions = request.args.get("exclude", [])
-    return get_markdown(source_id, user_id, latest=get_latest, exclusions=exclusions)
+    return generate_source_markdown(
+        source_id, user_id, latest=get_latest, exclusions=exclusions
+    )
 
 
 @api.post("/source/<int:source_id>/sync")

@@ -1,3 +1,4 @@
+import os
 from threading import Thread
 
 import jinja_partials
@@ -15,7 +16,7 @@ app = Flask(__name__)
 CORS(app)
 
 
-@app.cli.command("create_db")
+@app.cli.command("create-db")
 def create_db():
     app.config.from_object(Config)
     db.init_app(app)
@@ -38,6 +39,7 @@ def create_app():
     engine = create_engine(f"{Config.SQLALCHEMY_DATABASE_URI}?check_same_thread=False")
     Session.configure(bind=engine)
     app.config.from_object(Config)
+    app.config['SECRET_KEY'] = os.getenv('CLIPNOTES_SECRET_KEY')
     app.register_blueprint(main)
     app.register_blueprint(api)
     db.init_app(app)
@@ -45,7 +47,6 @@ def create_app():
     return app
 
 
-# TODO: Remove this eventually
 if __name__ == "__main__":
     app = create_app()
     app.run("0.0.0.0", debug=True)
