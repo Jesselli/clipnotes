@@ -119,16 +119,6 @@ def create_snippet():
         return "Not authenticated"
 
 
-@main.post("/snippet/enqueue")
-def enqueue_snippet():
-    url = request.args.get("url")
-    duration = request.args.get("duration", 60, type=int)
-    time = request.args.get("time", 0)
-    user_id = 1
-    source_processors.add_to_queue(url, user_id, time, duration)
-    return f"Added {url} to queue", 200
-
-
 @main.put("/snippet/<int:snippet_id>")
 def update_snippet(snippet_id):
     text = request.form.get("text")
@@ -194,7 +184,7 @@ def api_get_source_markdown(source_id):
 
 
 @api.post("/source/<int:source_id>/sync")
-def create_sync_record(source_id):
+def api_update_sync(source_id):
     api_key = request.headers.get("X-Api-Key")
     user_id = Device.find_by_key(api_key).user_id
     sync_record = SyncRecord.find_by_user_source(user_id, source_id)
@@ -207,9 +197,20 @@ def create_sync_record(source_id):
 
 
 @api.get("/sources")
-def get_sources():
+def api_get_sources():
     # TODO Better parsing of args -- failure states
     api_key = request.headers.get("X-Api-Key")
     user_id = Device.find_by_key(api_key).user_id
     sources = Source.get_user_sources_snippets(user_id)
     return jsonify(sources)
+
+
+@api.post("/enqueue")
+def api_enqueue():
+    api_key = request.headers.get("X-Api-Key")
+    url = request.args.get("url")
+    time = request.args.get("time", 0)
+    duration = request.args.get("duration", 60, type=int)
+    user_id = Device.find_by_key(api_key).user_id
+    source_processors.add_to_queue(url, user_id, time, duration)
+    return "Success", 200

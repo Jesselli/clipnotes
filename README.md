@@ -126,12 +126,47 @@ pasting is powerful in that it works everywhere all the time. [108](https://yout
 
 > | http code     | content-type                      | response                                                            |
 > |---------------|-----------------------------------|---------------------------------------------------------------------|
-> | `200`         | `application/json`                | `Updated SyncRecord`                                |
+> | `200`         | `application/json`                | `Updated SyncRecord`                                                |
 
 ##### Example cURL
 
 > ```javascript
 >  curl -X POST -H "X-Api-Key: YOUR_KEY" http://localhost:8080/api/source/1/sync
+> ```
+
+##### Example Response
+```json
+{
+    "id": 1,
+    "source_id": 1,
+    "synced_at": "Mon, 22 May 2023 17:39:17 GMT",
+    "user_id": 1
+}
+```
+</details>
+
+<details>
+ <summary><code>POST</code> <code><b>/api/enqueue</b></code> <code>(adds a source to the processing queue)</code></summary>
+
+##### Parameters
+
+> | name      |  type     | data type               | description                                                           |
+> |-----------|-----------|-------------------------|-----------------------------------------------------------------------|
+> | url       |  required | string                  |                                                                       |
+> | time      |  optional | int                     | the timestamp (in seconds) for the snippet                            |
+> | duration  |  optional | int                     | the duration of the snippet (in seconds)                              |
+
+
+##### Responses
+
+> | http code     | content-type                      | response                                                            |
+> |---------------|-----------------------------------|---------------------------------------------------------------------|
+> | `200`         | `text/plain`                      | `Success`                                                           |
+
+##### Example cURL
+
+> ```javascript
+> curl -X POST -H "X-Api-Key: YOUR_KEY" "http://localhost:5000/api/enqueue?url=https://youtu.be/T6hmdrsLQj8&time=711&duration=60"
 > ```
 
 ##### Example Response
