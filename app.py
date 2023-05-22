@@ -29,6 +29,13 @@ def create_db():
     db.create_all()
 
 
+@app.cli.command("drop-db")
+def drop_db():
+    config_app()
+    db.init_app(app)
+    db.drop_all()
+
+
 def create_app():
     queue_thread = Thread(target=source_processors.process_queue)
     queue_thread.daemon = True

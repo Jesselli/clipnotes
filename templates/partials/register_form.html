@@ -3,26 +3,34 @@
         <h1 class="text-center">Register</h1>
     </div>
     <div class="card-body">
-        {% if message %}
-        <div class="alert alert-{{style}}" role="alert">
-            {{ message }}
-        </div>
-        {% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% if category != 'message' %}
+                        <div class="alert alert-{{category}}" role="alert" data-testid="div_alert">
+                    {% else %}
+                        <div class="alert alert-info" role="alert" data-testid="div_alert">
+                    {% endif %}
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
         <form hx-post="/register" hx-target="#form-container">
             <div class="mb-3">
                 <label for="email" class="form-label">Email address</label>
-                <input type="email" id="email" name="email" class="form-control" required>
+                <input type="email" id="email" name="email" class="form-control" data-testid="input_email" required>
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Password</label>
-                <input type="password" id="password" name="password" class="form-control" required>
+                <input type="password" id="password" name="password" class="form-control" data-testid="input_password" required>
             </div>
             <div class="mb-3">
-                <label for="confirm_password" class="form-label">Confirm Password</label>
+                <label for="confirm_password" class="form-label" data-testid="input_confirm_password">Confirm Password</label>
                 <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
             </div>
             <div class="mb-3">
-                <button type="submit" class="btn btn-primary">Register</button>
+                <button type="submit" class="btn btn-primary" data-testid="button_register">Register</button>
             </div>
             <div class="mb-3">
                 <p>Already have an account? <a href="/login">Login here</a></p>

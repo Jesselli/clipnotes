@@ -1,6 +1,6 @@
 {% extends "shared/_layout.html" %}
 {% block main_content %}
-<div class="card mb-5">
+<div class="card mb-5" data-testid="div_addclip">
     <h5 class="card-header">Add a clip</h5>
     <div class="card-body">
         <form hx-post="/snippets" hx-target="#sources" hx-indicator=".htmx-indicator">

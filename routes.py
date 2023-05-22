@@ -56,10 +56,8 @@ def login_post():
             response.headers["HX-Redirect"] = "/"
             return response
 
-    style = "danger"
-    message = "Invalid credentials."
-    template = "partials/login_form.html"
-    return render_template(template, message=message, style=style)
+    flash("Invalid credentials.", "danger")
+    return render_template("partials/login_form.html")
 
 
 @main.post("/register")
@@ -67,19 +65,15 @@ def register_user():
     password = request.form["password"]
     password_confirmation = request.form["confirm_password"]
     if password != password_confirmation:
-        style = "danger"
-        message = "Passwords do not match."
-        template = "partials/register_form.html"
-        return render_template(template, message=message, style=style)
+        flash("Passwords must match.", "danger")
+        return render_template("partials/register_form.html")
     email = request.form["email"]
     password_hash = generate_password_hash(password)
 
     user = User.find_by_email(email)
     if user:
-        style = "danger"
-        message = "User already exists."
-        template = "partials/register_form.html"
-        return render_template(template, message=message, style=style)
+        flash("User already exists.", "danger")
+        return render_template("partials/register_form.html")
 
     User.create(email, password_hash)
     flash("User created. Please login.", "success")

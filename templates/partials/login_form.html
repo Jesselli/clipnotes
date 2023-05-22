@@ -3,18 +3,13 @@
         <h1 class="text-center">Login</h1>
     </div>
     <div class="card-body">
-        {% if message %}
-        <div class="alert alert-{{style}}" role="alert">
-            {{ message }}
-        </div>
-        {% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
                     {% if category != 'message' %}
-                        <div class="alert alert-{{category}}" role="alert">
+                        <div class="alert alert-{{category}}" role="alert" data-testid="div_alert">
                     {% else %}
-                        <div class="alert alert-info" role="alert">
+                        <div class="alert alert-info" role="alert" data-testid="div_alert">
                     {% endif %}
                         {{ message }}
                     </div>
@@ -23,15 +18,15 @@
         {% endwith %}
         <form hx-post="/login" hx-target="#form-container">
             <div class="mb-3">
-                <label for="email" class="form-label">Email address</label>
+                <label for="email" class="form-label" data-testid="input_email">Email address</label>
                 <input type="email" id="email" name="email" class="form-control" required>
             </div>
             <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
+                <label for="password" class="form-label" data-testid="input_password">Password</label>
                 <input type="password" id="password" name="password" class="form-control" required>
             </div>
             <div class="mb-3">
-                <button type="submit" class="btn btn-primary">Login</button>
+                <button type="submit" class="btn btn-primary" data-testid="button_login">Login</button>
             </div>
             <div class="mb-3">
                 <p>Don't have an account? <a href="/register">Register here</a></p>
