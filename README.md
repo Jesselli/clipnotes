@@ -2,7 +2,7 @@
 A web app for turning podcasts and streaming video into markdown for note-taking
 
 ## Purpose
-I started this project because I like to take notes in Obsidian. While there are plenty of workflows for syncing text-based snippets to your notebooks from sources like Kindle, there was no seemless way to do the same thing for podcasts and streaming video.
+I started this project because I like to take notes in [Obsidian](https://obsidian.md/). While there are plenty of workflows for syncing text-based snippets to your notebooks from sources like Kindle, there was no seemless way to do the same thing for podcasts and streaming video.
 
 Clipnotes consumes an audio source and a timestamp and turns that into text for you to include in your notes. While it has a front-end for browsing and editing your sources, its primary purpose is to provide an API so that other apps can submit clips and retrieve markdown in the background automatically. This was developed side-by-side with an Obsidian plugin that does exactly that.
 
