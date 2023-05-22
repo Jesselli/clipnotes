@@ -7,7 +7,6 @@ from flask_cors import CORS
 from flask_login import LoginManager
 from sqlalchemy import create_engine
 
-from config import Config
 from models import Session, User, db
 from routes import api, main
 from services import source_processors
@@ -16,9 +15,16 @@ app = Flask(__name__)
 CORS(app)
 
 
+def config_app():
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    db_path = os.path.join(app.instance_path, "snippets.db")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+
+
 @app.cli.command("create-db")
 def create_db():
-    app.config.from_object(Config)
+    config_app()
     db.init_app(app)
     db.create_all()
 
@@ -36,10 +42,10 @@ def create_app():
     def load_user(user):
         return User.get_by_id(int(user))
 
-    engine = create_engine(f"{Config.SQLALCHEMY_DATABASE_URI}?check_same_thread=False")
+    config_app()
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI")
+    engine = create_engine(f"{db_uri}?check_same_thread=False")
     Session.configure(bind=engine)
-    app.config.from_object(Config)
-    app.config['SECRET_KEY'] = os.getenv('CLIPNOTES_SECRET_KEY')
     app.register_blueprint(main)
     app.register_blueprint(api)
     db.init_app(app)
