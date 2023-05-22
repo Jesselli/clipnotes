@@ -5,6 +5,7 @@ WORKDIR /app
 RUN pip install -r requirements.txt
 RUN apt update && apt install -y ffmpeg
 COPY . /app
+RUN mkdir instance
 RUN flask create-db
 ENTRYPOINT [ "waitress-serve" ]
 CMD [ "--call", "app:create_app"]
