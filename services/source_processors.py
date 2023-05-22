@@ -30,10 +30,10 @@ def get_time_from_url(url):
         time = time.group(1)
         return time
 
-    return 0
+    return None
 
 
-def get_seconds_from_time(time):
+def get_seconds_from_time_str(time):
     """
     time: str
         format: 1m30s or 90s or 90
@@ -69,7 +69,7 @@ def add_source(url, title=None, thumbnail=None, provider=None):
 
 
 def add_snippet(audio_filepath, time, duration, source, user_id):
-    seconds = get_seconds_from_time(time)
+    seconds = get_seconds_from_time_str(time)
     clip_wav = files.create_wav_clip(audio_filepath, seconds, duration)
     text = whisper_recognize(clip_wav)
     snippet = Snippet(
@@ -85,12 +85,15 @@ def process_url(url, user_id, time, duration):
     thumbnail_path = None
     parsed_url = urlparse(url)
     if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
-        source, audio_filepath, time = process_youtube_link(url)
+        source, audio_filepath = process_youtube_link(url)
     elif parsed_url.hostname in ["pca.st"]:
-        source, audio_filepath, time = process_pocketcast_link(url)
+        source, audio_filepath = process_pocketcast_link(url)
     else:
         audio_filepath = files.download_file(url)
         source = add_source(url, title=title, thumbnail=thumbnail_path)
+
+    if (url_time := get_time_from_url(url)):
+        time = url_time
 
     add_snippet(audio_filepath, time, duration, source, user_id)
     files.cleanup_tmp_files()
@@ -121,9 +124,8 @@ def process_youtube_link(url):
     # TODO: Include source name (Veritasium, Daily Stoic, etc.)
     audio_filepath = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
     thumbnail = info_dict.get("thumbnail", "")
-    time = get_time_from_url(url)
     source = add_source(url, title=title, thumbnail=thumbnail, provider="youtube")
-    return source, audio_filepath, time
+    return source, audio_filepath
 
 
 def process_pocketcast_link(url):
@@ -135,9 +137,8 @@ def process_pocketcast_link(url):
     title = soup.find("meta", {"property": "og:title"})["content"]
     thumb_url = soup.find("meta", {"property": "og:image"})["content"]
 
-    time = get_time_from_url(url)
     source = add_source(url, title, thumb_url, "pocketcast")
-    return source, audio_filepath, time
+    return source, audio_filepath
 
 
 def process_queue():

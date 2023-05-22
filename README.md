@@ -153,7 +153,7 @@ pasting is powerful in that it works everywhere all the time. [108](https://yout
 > | name      |  type     | data type               | description                                                           |
 > |-----------|-----------|-------------------------|-----------------------------------------------------------------------|
 > | url       |  required | string                  |                                                                       |
-> | time      |  optional | int                     | the timestamp (in seconds) for the snippet                            |
+> | time      |  optional | int                     | the timestamp (in seconds) for the snippet. If the url has a timestamp, the one in the url will take precedence. 
 > | duration  |  optional | int                     | the duration of the snippet (in seconds)                              |
 
 
