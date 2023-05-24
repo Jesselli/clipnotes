@@ -55,10 +55,14 @@ def whisper_recognize(clip):
     return text_whisper
 
 
-def add_source(url, title=None, thumbnail=None, provider=None):
+def get_url_without_query_params(url):
     parsed_url = urlparse(url)
     url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+    return url
 
+
+def add_source(url, title=None, thumbnail=None, provider=None):
+    url = get_url_without_query_params(url)
     existing_source = Session.query(Source).filter_by(url=url).first()
     if existing_source:
         source = existing_source
@@ -84,6 +88,13 @@ def process_url(url, user_id, time, duration):
     title = None
     thumbnail_path = None
     parsed_url = urlparse(url)
+
+    base_url = get_url_without_query_params(url)
+    time = get_time_from_url(url)
+    if Source.find_snippet(base_url, time, duration):
+        print("Snippet already exists. Skipping processing.")
+        return
+
     if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
         source, audio_filepath = process_youtube_link(url)
     elif parsed_url.hostname in ["pca.st"]:
@@ -92,7 +103,7 @@ def process_url(url, user_id, time, duration):
         audio_filepath = files.download_file(url)
         source = add_source(url, title=title, thumbnail=thumbnail_path)
 
-    if (url_time := get_time_from_url(url)):
+    if url_time := get_time_from_url(url):
         time = url_time
 
     add_snippet(audio_filepath, time, duration, source, user_id)
@@ -144,9 +155,12 @@ def process_pocketcast_link(url):
 def process_queue():
     while True:
         if task := queue.get():
+            print("Starting queue job.")
             process_url(task["url"], task["user_id"], task["time"], task["duration"])
             queue.task_done()
+            print("Queue job complete.")
 
 
 def add_to_queue(url, user_id, time, duration):
+    print(f"Adding {url} to queue")
     queue.put({"url": url, "user_id": user_id, "time": time, "duration": duration})

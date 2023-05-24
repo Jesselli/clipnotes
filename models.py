@@ -92,6 +92,15 @@ class Source(db.Model, BaseModel):
     def find_by_id(cls, source_id):
         return Session.query(Source).filter_by(id=source_id).first()
 
+    @classmethod
+    def find_snippet(cls, url, time, duration):
+        filter = and_(
+            Snippet.source_id == Source.id,
+            Snippet.time == time,
+            Snippet.duration == duration,
+        )
+        return Session.query(Source).filter_by(url=url).filter(filter).first()
+
 
 @dataclass
 class SyncRecord(db.Model, BaseModel):
@@ -140,6 +149,10 @@ class User(db.Model, UserMixin, BaseModel):
         return f"<User {self.id} - {self.name}>"
 
     @classmethod
+    def get_all(cls):
+        return Session.query(User).all()
+
+    @classmethod
     def create(cls, email, password):
         user = User(email=email, password=password)
         Session.add(user)
@@ -172,6 +185,13 @@ class UserSettings(db.Model, BaseModel):
             .filter_by(user_id=user_id, setting_name=setting_name)
             .first()
         )
+
+    @classmethod
+    def get_value(cls, user_id, setting_name):
+        setting = cls.find_by_user_and_setting_name(user_id, setting_name)
+        if setting:
+            return setting.setting_value
+        return None
 
     def update_value(self, value):
         self.setting_value = value

@@ -1,5 +1,5 @@
 import os
-from threading import Thread
+from threading import Thread, Timer
 
 import jinja_partials
 from flask import Flask
@@ -9,10 +9,24 @@ from sqlalchemy import create_engine
 
 from models import Session, User, db
 from routes import api, main
-from services import source_processors
+from services import source_processors, readwise
+
+
+class RepeatingTimer(Timer):
+    def run(self):
+        while not self.finished.wait(self.interval):
+            self.function(*self.args, **self.kwargs)
+
 
 app = Flask(__name__)
 CORS(app)
+
+queue_thread = Thread(target=source_processors.process_queue)
+queue_thread.daemon = True
+queue_thread.start()
+
+timer = RepeatingTimer(60.0, readwise.timer_job)
+timer.start()
 
 
 def config_app():
@@ -37,10 +51,6 @@ def drop_db():
 
 
 def create_app():
-    queue_thread = Thread(target=source_processors.process_queue)
-    queue_thread.daemon = True
-    queue_thread.start()
-
     login_manager = LoginManager()
     login_manager.login_view = "main.login"
     login_manager.init_app(app)
@@ -57,6 +67,7 @@ def create_app():
     app.register_blueprint(api)
     db.init_app(app)
     jinja_partials.register_extensions(app)
+
     return app
 
 
