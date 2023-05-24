@@ -155,6 +155,29 @@ class User(db.Model, UserMixin, BaseModel):
         return Session.query(User).get(user_id)
 
 
+class UserSettings(db.Model, BaseModel):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    setting_name = db.Column(db.String(80), nullable=False)
+    setting_value = db.Column(db.String(80), nullable=False)
+
+    @classmethod
+    def find_by_user_id(cls, user_id):
+        return Session.query(UserSettings).filter_by(user_id=user_id).all()
+
+    @classmethod
+    def find_by_user_and_setting_name(cls, user_id, setting_name):
+        return (
+            Session.query(UserSettings)
+            .filter_by(user_id=user_id, setting_name=setting_name)
+            .first()
+        )
+
+    def update_value(self, value):
+        self.setting_value = value
+        Session.commit()
+
+
 class Device(db.Model, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     device_name = db.Column(db.String(80), nullable=False)

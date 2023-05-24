@@ -12,7 +12,7 @@ from flask import (
 from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Device, Snippet, Source, SyncRecord, User
+from models import Device, Snippet, Source, SyncRecord, User, UserSettings
 from services import source_processors
 from services.markdown import generate_source_markdown
 
@@ -58,6 +58,31 @@ def login_post():
 
     flash("Invalid credentials.", "danger")
     return render_template("partials/login_form.html")
+
+
+@main.get("/settings")
+@login_required
+def get_settings():
+    user_id = current_user.id
+    user_settings = UserSettings.find_by_user_id(user_id)
+    settings = {}
+    for user_setting in user_settings:
+        settings[user_setting.setting_name] = user_setting.setting_value
+    return render_template("settings.html", settings=settings)
+
+
+@main.post("/settings")
+def post_settings():
+    user_id = current_user.id
+    for setting_name in request.form:
+        existing_setting = UserSettings.find_by_user_and_setting_name(user_id, setting_name)
+        value = request.form.get(setting_name)
+        if existing_setting:
+            existing_setting.update_value(value)
+        else:
+            new_setting = UserSettings(user_id=user_id, setting_name=setting_name, setting_value=value)
+            new_setting.add_to_db()
+    return "Success",  200
 
 
 @main.post("/register")
