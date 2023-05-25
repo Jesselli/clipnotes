@@ -1,10 +1,14 @@
-import time
 import csv
-from io import StringIO
-import requests
+import time
+import logging
 from datetime import timezone
+from io import StringIO
+
+import requests
 from dateutil.parser import parse
-from models import UserSettings, User, ExternalSyncRecord
+
+from models import ExternalSyncRecord, User, UserSettings
+
 from . import source_processors
 
 readwise_url = "https://readwise.io/api/v2"
@@ -143,5 +147,5 @@ def toggle_title(user_id, title):
 def timer_job():
     while True:
         time.sleep(60)
-        print("Running timer job")
+        logging.info("Running timer job")
         add_new_highlights_to_queue()

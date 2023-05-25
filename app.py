@@ -1,4 +1,5 @@
 import os
+import logging
 from threading import Thread
 
 import jinja_partials
@@ -9,8 +10,7 @@ from sqlalchemy import create_engine
 
 from models import Session, User, db
 from routes import api, main
-from services import source_processors, readwise
-
+from services import readwise, source_processors
 
 app = Flask(__name__)
 CORS(app)
@@ -22,6 +22,8 @@ queue_thread.start()
 external_sync_thread = Thread(target=readwise.timer_job)
 external_sync_thread.daemon = True
 external_sync_thread.start()
+
+logging.basicConfig(filename="instance/clipnotes.log", level=logging.DEBUG)
 
 
 def config_app():

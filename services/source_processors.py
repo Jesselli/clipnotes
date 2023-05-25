@@ -1,5 +1,6 @@
 import re
 import uuid
+import logging
 from queue import Queue
 from urllib.parse import parse_qs, urlparse
 
@@ -92,7 +93,7 @@ def process_url(url, user_id, time, duration):
     base_url = get_url_without_query_params(url)
     time = get_time_from_url(url)
     if Source.find_snippet(base_url, time, duration):
-        print("Snippet already exists. Skipping processing.")
+        logging.info("Snippet already exists. Skipping processing.")
         return
 
     if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
@@ -156,14 +157,14 @@ def process_queue():
     # TODO: Look into a more appropriate way of doing this than while true?
     while True:
         if task := queue.get():
-            print("Starting queue job.")
+            logging.info("Starting queue job.")
             process_url(task["url"], task["user_id"], task["time"], task["duration"])
             queue.task_done()
-            print("Queue job complete.")
+            logging.info("Queue job complete.")
 
 
 def add_to_queue(url, user_id, time, duration):
-    print(f"Adding {url} to queue")
+    logging.info(f"Adding {url} to queue")
     queue.put({"url": url, "user_id": user_id, "time": time, "duration": duration})
 
 
