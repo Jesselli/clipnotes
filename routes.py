@@ -75,7 +75,7 @@ def get_settings():
 def post_settings():
     user_id = current_user.id
     for setting_name in request.form:
-        existing_setting = UserSettings.find_by_user_and_setting_name(user_id, setting_name)
+        existing_setting = UserSettings.find_by_setting_name(user_id, setting_name)
         value = request.form.get(setting_name)
         if existing_setting:
             existing_setting.update_value(value)

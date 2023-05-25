@@ -1,5 +1,5 @@
 import os
-from threading import Thread, Timer
+from threading import Thread
 
 import jinja_partials
 from flask import Flask
@@ -12,12 +12,6 @@ from routes import api, main
 from services import source_processors, readwise
 
 
-class RepeatingTimer(Timer):
-    def run(self):
-        while not self.finished.wait(self.interval):
-            self.function(*self.args, **self.kwargs)
-
-
 app = Flask(__name__)
 CORS(app)
 
@@ -25,8 +19,9 @@ queue_thread = Thread(target=source_processors.process_queue)
 queue_thread.daemon = True
 queue_thread.start()
 
-timer = RepeatingTimer(60.0, readwise.timer_job)
-timer.start()
+external_sync_thread = Thread(target=readwise.timer_job)
+external_sync_thread.daemon = True
+external_sync_thread.start()
 
 
 def config_app():

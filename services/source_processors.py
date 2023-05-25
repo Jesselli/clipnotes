@@ -153,6 +153,7 @@ def process_pocketcast_link(url):
 
 
 def process_queue():
+    # TODO: Look into a more appropriate way of doing this than while true?
     while True:
         if task := queue.get():
             print("Starting queue job.")
@@ -164,3 +165,8 @@ def process_queue():
 def add_to_queue(url, user_id, time, duration):
     print(f"Adding {url} to queue")
     queue.put({"url": url, "user_id": user_id, "time": time, "duration": duration})
+
+
+def add_batch_to_queue(tasks):
+    for task in tasks:
+        add_to_queue(task["url"], task["user_id"], task["time"], task["duration"])

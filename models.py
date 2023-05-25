@@ -137,6 +137,45 @@ class SyncRecord(db.Model, BaseModel):
         Session.commit()
 
 
+class ExternalSyncRecord(db.Model, BaseModel):
+    id: int
+    user_id: int
+    service: str
+    synced_at: str
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    service = db.Column(db.String(255), nullable=False)
+    synced_at = db.Column(db.DateTime, default=db.func.now())
+
+    def update_sync_time(self, time=db.func.now()):
+        self.synced_at = time
+        Session.commit()
+
+    @classmethod
+    def find_by_user_service(cls, user_id, service):
+        record = (
+            Session.query(ExternalSyncRecord)
+            .filter_by(user_id=user_id, service=service)
+            .first()
+        )
+        return record
+
+    @staticmethod
+    def get_readwise_sync_record(user_id):
+        return ExternalSyncRecord.find_by_user_service(user_id, "readwise")
+
+    @staticmethod
+    def add_readwise_sync_record(user_id):
+        sync_record = ExternalSyncRecord(user_id=user_id, service="readwise")
+        sync_record.add_to_db()
+
+    @staticmethod
+    def update_readwise_sync_record(user_id):
+        sync_record = ExternalSyncRecord.find_by_user_service(user_id, "readwise")
+        sync_record.update_sync_time()
+
+
 @dataclass
 class User(db.Model, UserMixin, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
@@ -179,7 +218,7 @@ class UserSettings(db.Model, BaseModel):
         return Session.query(UserSettings).filter_by(user_id=user_id).all()
 
     @classmethod
-    def find_by_user_and_setting_name(cls, user_id, setting_name):
+    def find_by_setting_name(cls, user_id, setting_name):
         return (
             Session.query(UserSettings)
             .filter_by(user_id=user_id, setting_name=setting_name)
@@ -188,7 +227,7 @@ class UserSettings(db.Model, BaseModel):
 
     @classmethod
     def get_value(cls, user_id, setting_name):
-        setting = cls.find_by_user_and_setting_name(user_id, setting_name)
+        setting = cls.find_by_setting_name(user_id, setting_name)
         if setting:
             return setting.setting_value
         return None
