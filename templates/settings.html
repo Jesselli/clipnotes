@@ -28,25 +28,32 @@
         </div>
 
         <div class="mb-3 row">
-            <label for="readwise_titles" class="col-form-label col-sm-2">Titles</label>
-            <div class="col-sm-10">
-                <input hx-post="/settings" hx-trigger="keyup changed delay:1s" type="text" id="readwise_titles"
-                    name="readwise_titles" class="form-control" aria-labelledby="titleshelp"
-                    value="{{settings.readwise_titles}}" required>
-                <div id="titleshelp" class="form-text">Only sync highlights from sources with specific titles</div>
-            </div>
-        </div>
-
-        <div class="mb-3 row">
             <label for="readwise_sync_frequency" class="col-form-label col-sm-2">Sync Frequency</label>
             <div class="col-sm-10">
                 <select hx-post="/settings" hx-swap="none" id="readwise_sync_frequency" name="readwise_sync_frequency"
                     class="form-select" aria-labelledby="titleshelp" required>
                     <option {% if settings.readwise_sync_frequency=="1" %}selected{% endif %} value="1">1 hour</option>
                     <option {% if settings.readwise_sync_frequency=="5" %}selected{% endif %} value="5">5 hours</option>
-                    <option {% if settings.readwise_sync_frequency=="10" %}selected{% endif %} value="10">10 hours</option>
+                    <option {% if settings.readwise_sync_frequency=="10" %}selected{% endif %} value="10">10 hours
+                    </option>
                 </select>
                 <div id="titleshelp" class="form-text">How often to check Readwise for highlights</div>
+            </div>
+        </div>
+
+        <div class="mb-3 row">
+            <label for="readwise_titles" class="col-form-label col-sm-2">Titles</label>
+            <div class="col-sm-10 overflow-y-scroll" style="height: 200px;">
+                {% for title in readwise_titles %}
+                <div class="form-check form-switch">
+                    {% if title in settings.readwise_titles %}
+                    <input hx-post="/external/readwise/title/{{title}}" hx-trigger="click" class="form-check-input" type="checkbox" role="switch" checked>
+                    {% else %}
+                    <input hx-post="/external/readwise/title/{{title}}" hx-trigger="click" class="form-check-input" type="checkbox" role="switch">
+                    {% endif %}
+                    <label class="form-check-label" name="{{title}}">{{title}}</label>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>

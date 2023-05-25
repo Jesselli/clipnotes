@@ -1,4 +1,6 @@
 import time
+import csv
+from io import StringIO
 import requests
 from datetime import timezone
 from dateutil.parser import parse
@@ -29,25 +31,25 @@ def filter_highlights(highlights, since, note):
     return filtered_highlights
 
 
-def filter_results(results, title, note, since):
+def filter_results(results, titles, note, since):
     highlights = []
     for result in results:
         r_title = result.get("title", "")
-        if title and title.casefold() != r_title.casefold():
+        if r_title not in titles:
             continue
 
         highlights.extend(filter_highlights(result["highlights"], since, note))
     return highlights
 
 
-def get_new_highlights(user_id, title=None, note=None):
+def get_new_highlights(user_id, titles=[], note=None):
     token = get_readwise_user_token(user_id)
     headers = {"Authorization": f"Token {token}"}
     response = requests.get(f"{readwise_url}/export", headers=headers)
     response_json = response.json()
     results = response_json["results"]
     last_sync_datetime = get_utc_sync_datetime(user_id)
-    return filter_results(results, title, note, last_sync_datetime)
+    return filter_results(results, titles, note, last_sync_datetime)
 
 
 def get_utc_sync_datetime(user_id):
@@ -79,16 +81,63 @@ def batch_tasks_from_highlights(highlights, user_id, time=0, duration=60):
     return tasks
 
 
+def get_titles(user_id):
+    token = get_readwise_user_token(user_id)
+    headers = {"Authorization": f"Token {token}"}
+    response = requests.get(f"{readwise_url}/export", headers=headers)
+    response_json = response.json()
+    results = response_json["results"]
+    titles = []
+    for result in results:
+        titles.append(result["title"])
+    return titles
+
+
 def add_new_highlights_to_queue():
     users = User.get_all()
     for user in users:
         # TODO: Don't use string literals for settings names
-        title = UserSettings.get_value(user.id, "readwise_titles")
+        titles = get_sync_titles(user.id)
         note = UserSettings.get_value(user.id, "readwise_notes")
-        highlights = get_new_highlights(user.id, title, note)
+        highlights = get_new_highlights(user.id, titles, note)
         add_or_update_sync_record(user.id)
         tasks = batch_tasks_from_highlights(highlights, user.id)
         source_processors.add_batch_to_queue(tasks)
+
+
+def get_sync_titles(user_id):
+    titles = UserSettings.get_value(user_id, "readwise_titles")
+    if titles:
+        reader = csv.reader(titles.splitlines())
+        for row in reader:
+            return row
+    return []
+
+
+def toggle_title(user_id, title):
+    titles = get_sync_titles(user_id)
+    if titles:
+        setting = UserSettings.find_by_setting_name(user_id, "readwise_titles")
+
+        if title in titles:
+            titles.remove(title)
+        else:
+            titles.append(title)
+
+        if not titles:
+            setting.delete_from_db()
+            return
+
+        csv_data = StringIO()
+        writer = csv.writer(csv_data)
+        writer.writerow(titles)
+        titles = csv_data.getvalue()
+        setting.update_value(titles)
+    else:
+        setting = UserSettings(
+            user_id=user_id, setting_name="readwise_titles", setting_value=title
+        )
+        setting.add_to_db()
 
 
 def timer_job():

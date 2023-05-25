@@ -15,6 +15,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from models import Device, Snippet, Source, SyncRecord, User, UserSettings
 from services import source_processors
 from services.markdown import generate_source_markdown
+from services import readwise
 
 main = Blueprint("main", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -66,9 +67,15 @@ def get_settings():
     user_id = current_user.id
     user_settings = UserSettings.find_by_user_id(user_id)
     settings = {}
+    # TODO Spin this off into its own function
     for user_setting in user_settings:
+        if user_setting.setting_name == "readwise_titles":
+            settings[user_setting.setting_name] = user_setting.setting_value.split(",")
         settings[user_setting.setting_name] = user_setting.setting_value
-    return render_template("settings.html", settings=settings)
+    readwise_titles = readwise.get_titles(user_id)
+    return render_template(
+        "settings.html", settings=settings, readwise_titles=readwise_titles
+    )
 
 
 @main.post("/settings")
@@ -80,9 +87,11 @@ def post_settings():
         if existing_setting:
             existing_setting.update_value(value)
         else:
-            new_setting = UserSettings(user_id=user_id, setting_name=setting_name, setting_value=value)
+            new_setting = UserSettings(
+                user_id=user_id, setting_name=setting_name, setting_value=value
+            )
             new_setting.add_to_db()
-    return "Success",  200
+    return "Success", 200
 
 
 @main.post("/register")
@@ -186,6 +195,14 @@ def delete_device(device_id):
     device = Device.find_by_id(device_id)
     device.delete_from_db()
     return ""
+
+
+# TODO Combine this with the generic POST /settings endpoint
+@main.post("/external/readwise/title/<string:title>")
+def add_readwise_title(title):
+    user_id = current_user.id
+    readwise.toggle_title(user_id, title)
+    return "Success", 200
 
 
 # API BLUEPRINT
