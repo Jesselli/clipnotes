@@ -46,6 +46,8 @@ def filter_results(results, titles, note, since):
 
 def get_new_highlights(user_id, titles=[], note=None):
     token = get_readwise_user_token(user_id)
+    if not token:
+        return []
     headers = {"Authorization": f"Token {token}"}
     response = requests.get(f"{readwise_url}/export", headers=headers)
     response_json = response.json()
@@ -84,12 +86,14 @@ def batch_tasks_from_highlights(highlights, user_id, time=0, duration=60):
 
 
 def get_titles(user_id):
+    titles = []
     token = get_readwise_user_token(user_id)
+    if not token:
+        return titles
     headers = {"Authorization": f"Token {token}"}
     response = requests.get(f"{readwise_url}/export", headers=headers)
     response_json = response.json()
     results = response_json["results"]
-    titles = []
     for result in results:
         titles.append(result["title"])
     return titles
