@@ -16,6 +16,7 @@ def download_file(url, directory=Config.TMP_DIRECTORY, filename=None):
     else:
         filename = filename + "." + parsed_url.path.split(".")[-1]
 
+    os.makedirs(directory, exist_ok=True)
     filepath = os.path.join(directory, filename)
     with open(filepath, "wb") as f:
         f.write(r.content)

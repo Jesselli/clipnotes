@@ -68,15 +68,19 @@ def get_settings():
     user_settings = UserSettings.find_by_user_id(user_id)
     settings = {}
     for user_setting in user_settings:
-        if user_setting.setting_name == "readwise_titles":
-            if "readwise_titles" in settings:
-                continue
         settings[user_setting.setting_name] = user_setting.setting_value
+    return render_template("settings.html", settings=settings)
+
+
+@main.get("/readwise/titles")
+def get_readwise_titles():
+    user_id = current_user.id
     readwise_titles = readwise.get_titles(user_id)
     readwise_sync_titles = readwise.get_sync_titles(user_id)
-    settings["readwise_titles"] = readwise_sync_titles
     return render_template(
-        "settings.html", settings=settings, readwise_titles=readwise_titles
+        "partials/readwise_titles.html",
+        readwise_titles=readwise_titles,
+        readwise_sync_titles=readwise_sync_titles,
     )
 
 
