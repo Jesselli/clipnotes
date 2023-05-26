@@ -210,45 +210,43 @@ class User(db.Model, UserMixin, BaseModel):
 class UserSettings(db.Model, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    setting_name = db.Column(db.String(80), nullable=False)
-    setting_value = db.Column(db.String(80), nullable=False)
+    name = db.Column(db.String(80), nullable=False)
+    value = db.Column(db.String(80), nullable=False)
 
-    @classmethod
-    def find_by_user_id(cls, user_id):
+    @staticmethod
+    def create(user_id, setting_name, value):
+        setting = UserSettings(user_id=user_id, name=setting_name, value=value)
+        setting.add_to_db()
+
+    @staticmethod
+    def find_by_user_id(user_id):
         return Session.query(UserSettings).filter_by(user_id=user_id).all()
 
-    @classmethod
-    def find_by_setting_name(cls, user_id, setting_name):
+    @staticmethod
+    def find(user_id, setting_name):
         return (
             Session.query(UserSettings)
-            .filter_by(user_id=user_id, setting_name=setting_name)
+            .filter_by(user_id=user_id, name=setting_name)
             .first()
         )
 
     @staticmethod
-    def find_all_by_setting_name(user_id, setting_name):
+    def find_all(user_id, setting_name):
         return (
             Session.query(UserSettings)
-            .filter_by(user_id=user_id, setting_name=setting_name)
+            .filter_by(user_id=user_id, name=setting_name)
             .all()
         )
 
     @staticmethod
-    def delete_by_setting_name(user_id, setting_name):
+    def delete(user_id, setting_name):
         Session.query(UserSettings).filter_by(
-            user_id=user_id, setting_name=setting_name
+            user_id=user_id, name=setting_name
         ).delete()
         Session.commit()
 
-    @classmethod
-    def get_value(cls, user_id, setting_name):
-        setting = cls.find_by_setting_name(user_id, setting_name)
-        if setting:
-            return setting.setting_value
-        return None
-
     def update_value(self, value):
-        self.setting_value = value
+        self.value = value
         Session.commit()
 
 

@@ -68,15 +68,15 @@ def get_settings():
     user_settings = UserSettings.find_by_user_id(user_id)
     settings = {}
     for user_setting in user_settings:
-        settings[user_setting.setting_name] = user_setting.setting_value
+        settings[user_setting.name] = user_setting.value
     return render_template("settings.html", settings=settings)
 
 
 @main.get("/readwise/titles")
 def get_readwise_titles():
     user_id = current_user.id
-    readwise_titles = readwise.get_titles(user_id)
-    readwise_sync_titles = readwise.get_sync_titles(user_id)
+    readwise_titles = readwise.get_all_titles(user_id)
+    readwise_sync_titles = readwise.get_sync_titles_from_db(user_id)
     return render_template(
         "partials/readwise_titles.html",
         readwise_titles=readwise_titles,
@@ -89,21 +89,18 @@ def post_settings():
     user_id = current_user.id
     if "readwise_titles" in request.form:
         readwise_titles = request.form.getlist("readwise_titles")
-        readwise.set_sync_titles(user_id, readwise_titles)
+        readwise.save_sync_titles_to_db(user_id, readwise_titles)
 
     for setting_name in request.form:
         if setting_name == "readwise_titles":
             continue
 
-        existing_setting = UserSettings.find_by_setting_name(user_id, setting_name)
+        existing_setting = UserSettings.find(user_id, setting_name)
         value = request.form.get(setting_name)
         if existing_setting:
             existing_setting.update_value(value)
         else:
-            new_setting = UserSettings(
-                user_id=user_id, setting_name=setting_name, setting_value=value
-            )
-            new_setting.add_to_db()
+            UserSettings.create(user_id, setting_name, value)
     return render_template("partials/readwise_settings.html", settings=request.form)
 
 

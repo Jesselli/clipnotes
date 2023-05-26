@@ -1,5 +1,6 @@
 import re
 import uuid
+import time
 import logging
 from queue import Queue
 from urllib.parse import parse_qs, urlparse
@@ -154,8 +155,8 @@ def process_pocketcast_link(url):
 
 
 def process_queue():
-    # TODO: Look into a more appropriate way of doing this than while true?
     while True:
+        time.sleep(1)
         if task := queue.get():
             logging.info("Starting queue job.")
             process_url(task["url"], task["user_id"], task["time"], task["duration"])

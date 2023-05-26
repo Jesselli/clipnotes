@@ -12,10 +12,10 @@ from . import source_processors
 readwise_url = "https://readwise.io/api/v2"
 
 
-def get_readwise_user_token(user_id):
-    user_settings = UserSettings.find_by_setting_name(user_id, "readwise_token")
+def get_token_from_db(user_id):
+    user_settings = UserSettings.find(user_id, "readwise_token")
     if user_settings:
-        return user_settings.setting_value
+        return user_settings.value
     return None
 
 
@@ -40,20 +40,27 @@ def filter_results(results, titles, note, since):
         if r_title not in titles:
             continue
 
-        highlights.extend(filter_highlights(result["highlights"], since, note))
+        filtered_highlights = filter_highlights(result["highlights"], since, note)
+        highlights.extend(filtered_highlights)
     return highlights
 
 
 def get_new_highlights(user_id, titles=[], note=None):
-    token = get_readwise_user_token(user_id)
+    logging.debug("Retrieving new highlights from Readwise")
+    token = get_token_from_db(user_id)
     if not token:
+        logging.warning("No Readwise token found")
         return []
+
     headers = {"Authorization": f"Token {token}"}
     response = requests.get(f"{readwise_url}/export", headers=headers)
     response_json = response.json()
     results = response_json["results"]
     last_sync_datetime = get_utc_sync_datetime(user_id)
-    return filter_results(results, titles, note, last_sync_datetime)
+    logging.debug(f"Last sync datetime: {last_sync_datetime}")
+    new_highlights = filter_results(results, titles, note, last_sync_datetime)
+    logging.debug(f"Found {len(new_highlights)} new highlights")
+    return new_highlights
 
 
 def get_utc_sync_datetime(user_id):
@@ -71,6 +78,20 @@ def add_or_update_sync_record(user_id):
         ExternalSyncRecord.update_readwise_sync_record(user_id)
 
 
+def get_all_titles(user_id):
+    titles = []
+    token = get_token_from_db(user_id)
+    if not token:
+        return titles
+    headers = {"Authorization": f"Token {token}"}
+    response = requests.get(f"{readwise_url}/export", headers=headers)
+    response_json = response.json()
+    results = response_json["results"]
+    for result in results:
+        titles.append(result["title"])
+    return titles
+
+
 def batch_tasks_from_highlights(highlights, user_id, time=0, duration=60):
     tasks = []
     for highlight in highlights:
@@ -85,51 +106,36 @@ def batch_tasks_from_highlights(highlights, user_id, time=0, duration=60):
     return tasks
 
 
-def get_titles(user_id):
-    titles = []
-    token = get_readwise_user_token(user_id)
-    if not token:
-        return titles
-    headers = {"Authorization": f"Token {token}"}
-    response = requests.get(f"{readwise_url}/export", headers=headers)
-    response_json = response.json()
-    results = response_json["results"]
-    for result in results:
-        titles.append(result["title"])
-    return titles
-
-
 def add_new_highlights_to_queue():
     users = User.get_all()
     for user in users:
         # TODO: Don't use string literals for settings names
-        titles = get_sync_titles(user.id)
-        note = UserSettings.get_value(user.id, "readwise_notes")
+        titles = get_sync_titles_from_db(user.id)
+        note = UserSettings.find(user.id, "readwise_notes")
+        if note:
+            note = note.value
         highlights = get_new_highlights(user.id, titles, note)
         add_or_update_sync_record(user.id)
         tasks = batch_tasks_from_highlights(highlights, user.id)
         source_processors.add_batch_to_queue(tasks)
 
 
-def get_sync_titles(user_id):
-    title_settings = UserSettings.find_all_by_setting_name(user_id, "readwise_titles")
+def get_sync_titles_from_db(user_id):
+    title_settings = UserSettings.find_all(user_id, "readwise_titles")
     titles = []
     for title_setting in title_settings:
-        titles.append(title_setting.setting_value)
+        titles.append(title_setting.value)
     return titles
 
 
-def set_sync_titles(user_id, titles):
-    UserSettings.delete_by_setting_name(user_id, "readwise_titles")
+def save_sync_titles_to_db(user_id, titles):
+    UserSettings.delete(user_id, "readwise_titles")
     for title in titles:
-        setting = UserSettings(
-            user_id=user_id, setting_name="readwise_titles", setting_value=title
-        )
-        setting.add_to_db()
+        UserSettings.create(user_id, "readwise_titles", title)
 
 
 def timer_job():
     while True:
         time.sleep(60)
-        logging.info("Running timer job")
+        logging.info("Readwise timer job triggered")
         add_new_highlights_to_queue()
