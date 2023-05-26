@@ -104,7 +104,7 @@ def post_settings():
                 user_id=user_id, setting_name=setting_name, setting_value=value
             )
             new_setting.add_to_db()
-    return "Success", 200
+    return render_template("partials/readwise_settings.html", settings=request.form)
 
 
 @main.post("/register")

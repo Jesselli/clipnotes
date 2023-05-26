@@ -8,50 +8,20 @@
         <div class="mb-3 row">
             <label for="readwise_token" class="col-form-label col-sm-2">Token</label>
             <div class="col-sm-10">
-                <input hx-post="/settings" hx-trigger="keyup changed delay:1s" type="text" id="readwise_token"
-                    name="readwise_token" class="form-control" aria-labelledby="tokenhelp"
-                    value="{{settings.readwise_token}}" required>
+                <div class="input-group">
+                    <input type="text" id="readwise_token" name="readwise_token" class="form-control"
+                        aria-labelledby="tokenhelp" value="{{settings.readwise_token}}" required>
+                    <button hx-post="/settings" hx-include="#readwise_token" hx-target="#readwise_settings"
+                        class="btn btn-success">Save</button>
+                </div>
                 <div id="tokenhelp" class="form-text">You can generate this at <a
                         href="https://readwise.io/access_token">https://readwise.io/access_token</a></div>
             </div>
         </div>
-
-        <div class="mb-3 row">
-            <label for="readwise_notes" class="col-form-label col-sm-2">Notes</label>
-            <div class="col-sm-10">
-                <input hx-post="/settings" hx-trigger="keyup changed delay:1s" type="text" id="readwise_notes"
-                    name="readwise_notes" class="form-control" aria-labelledby="noteshelp"
-                    value="{{settings.readwise_notes}}" required>
-                <div id="noteshelp" class="form-text">Only sync highlights containing specific note words (like
-                    'clipnotes,' for instance).</div>
-            </div>
-        </div>
-
-        <div class="mb-3 row">
-            <label for="readwise_sync_frequency" class="col-form-label col-sm-2">Sync Frequency</label>
-            <div class="col-sm-10">
-                <select hx-post="/settings" hx-swap="none" id="readwise_sync_frequency" name="readwise_sync_frequency"
-                    class="form-select" aria-labelledby="titleshelp" required>
-                    <option {% if settings.readwise_sync_frequency=="1" %}selected{% endif %} value="1">1 hour</option>
-                    <option {% if settings.readwise_sync_frequency=="5" %}selected{% endif %} value="5">5 hours</option>
-                    <option {% if settings.readwise_sync_frequency=="10" %}selected{% endif %} value="10">10 hours
-                    </option>
-                </select>
-                <div id="titleshelp" class="form-text">How often to check Readwise for highlights</div>
-            </div>
-        </div>
-
-        <div class="mb-3 row" hx-get="/readwise/titles" hx-trigger="load">
-            <label for="readwise_titles" class="col-form-label col-sm-2">Titles</label>
-            <div class="col-sm-10 overflow-y-scroll" style="height: 200px;" id="readwise_titles">
-                {% for i in range(10) %}
-                <div class="form-check form-switch placeholder-glow">
-                    <input hx-post="/settings" hx-trigger="click" class="form-check-input placeholder" hx-include="#readwise_titles"
-                        type="checkbox" role="switch" name="readwise_titles" value="{{title}}">
-                    <label class="form-check-label placeholder">Placeholder readwise title</label>
-                </div>
-                {% endfor %}
-            </div>
+        <div id="readwise_settings">
+            {% if settings.readwise_token %}
+            {{render_partial("partials/readwise_settings.html", settings=settings)}}
+            {% endif %}
         </div>
     </div>
     {% endblock %}
