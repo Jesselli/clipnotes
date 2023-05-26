@@ -6,6 +6,7 @@ Flask-SQLAlchemy
 jinja-partials
 openai-whisper
 pydub
+python-dateutil
 requests
 soundfile
 SpeechRecognition
