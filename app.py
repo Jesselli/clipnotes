@@ -23,6 +23,7 @@ external_sync_thread = Thread(target=readwise.timer_job)
 external_sync_thread.daemon = True
 external_sync_thread.start()
 
+# TODO Configurable logging level
 logging.basicConfig(filename="instance/clipnotes.log", level=logging.DEBUG)
 
 

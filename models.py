@@ -225,6 +225,21 @@ class UserSettings(db.Model, BaseModel):
             .first()
         )
 
+    @staticmethod
+    def find_all_by_setting_name(user_id, setting_name):
+        return (
+            Session.query(UserSettings)
+            .filter_by(user_id=user_id, setting_name=setting_name)
+            .all()
+        )
+
+    @staticmethod
+    def delete_by_setting_name(user_id, setting_name):
+        Session.query(UserSettings).filter_by(
+            user_id=user_id, setting_name=setting_name
+        ).delete()
+        Session.commit()
+
     @classmethod
     def get_value(cls, user_id, setting_name):
         setting = cls.find_by_setting_name(user_id, setting_name)

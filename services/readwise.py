@@ -1,8 +1,6 @@
-import csv
 import time
 import logging
 from datetime import timezone
-from io import StringIO
 
 import requests
 from dateutil.parser import parse
@@ -110,34 +108,16 @@ def add_new_highlights_to_queue():
 
 
 def get_sync_titles(user_id):
-    titles = UserSettings.get_value(user_id, "readwise_titles")
-    if titles:
-        reader = csv.reader(titles.splitlines())
-        for row in reader:
-            return row
-    return []
+    title_settings = UserSettings.find_all_by_setting_name(user_id, "readwise_titles")
+    titles = []
+    for title_setting in title_settings:
+        titles.append(title_setting.setting_value)
+    return titles
 
 
-def toggle_title(user_id, title):
-    titles = get_sync_titles(user_id)
-    if titles:
-        setting = UserSettings.find_by_setting_name(user_id, "readwise_titles")
-
-        if title in titles:
-            titles.remove(title)
-        else:
-            titles.append(title)
-
-        if not titles:
-            setting.delete_from_db()
-            return
-
-        csv_data = StringIO()
-        writer = csv.writer(csv_data)
-        writer.writerow(titles)
-        titles = csv_data.getvalue()
-        setting.update_value(titles)
-    else:
+def set_sync_titles(user_id, titles):
+    UserSettings.delete_by_setting_name(user_id, "readwise_titles")
+    for title in titles:
         setting = UserSettings(
             user_id=user_id, setting_name="readwise_titles", setting_value=title
         )

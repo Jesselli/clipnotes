@@ -13,9 +13,8 @@ from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from models import Device, Snippet, Source, SyncRecord, User, UserSettings
-from services import source_processors
+from services import readwise, source_processors
 from services.markdown import generate_source_markdown
-from services import readwise
 
 main = Blueprint("main", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -61,6 +60,7 @@ def login_post():
     return render_template("partials/login_form.html")
 
 
+# TODO Cleanup the UserSettings code in routes.py
 @main.get("/settings")
 @login_required
 def get_settings():
@@ -68,8 +68,13 @@ def get_settings():
     user_settings = UserSettings.find_by_user_id(user_id)
     settings = {}
     for user_setting in user_settings:
+        if user_setting.setting_name == "readwise_titles":
+            if "readwise_titles" in settings:
+                continue
         settings[user_setting.setting_name] = user_setting.setting_value
     readwise_titles = readwise.get_titles(user_id)
+    readwise_sync_titles = readwise.get_sync_titles(user_id)
+    settings["readwise_titles"] = readwise_sync_titles
     return render_template(
         "settings.html", settings=settings, readwise_titles=readwise_titles
     )
@@ -78,7 +83,14 @@ def get_settings():
 @main.post("/settings")
 def post_settings():
     user_id = current_user.id
+    if "readwise_titles" in request.form:
+        readwise_titles = request.form.getlist("readwise_titles")
+        readwise.set_sync_titles(user_id, readwise_titles)
+
     for setting_name in request.form:
+        if setting_name == "readwise_titles":
+            continue
+
         existing_setting = UserSettings.find_by_setting_name(user_id, setting_name)
         value = request.form.get(setting_name)
         if existing_setting:
@@ -192,14 +204,6 @@ def delete_device(device_id):
     device = Device.find_by_id(device_id)
     device.delete_from_db()
     return ""
-
-
-# TODO Combine this with the generic POST /settings endpoint
-@main.post("/external/readwise/title/<string:title>")
-def add_readwise_title(title):
-    user_id = current_user.id
-    readwise.toggle_title(user_id, title)
-    return "Success", 200
 
 
 # API BLUEPRINT
