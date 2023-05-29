@@ -18,21 +18,21 @@ r = sr.Recognizer()
 queue = Queue()
 
 
-def get_time_from_url(url):
+def get_time_from_url(url: str) -> int:
     parsed_url = urlparse(url)
     params = parse_qs(parsed_url.query)
     if "t" in params:
         time = params["t"][0]
-        return time
+        return int(time)
 
     fragment = parsed_url.fragment
     regex = r"t=(\d+[sm]?\d+[s]?)"
     time = re.search(regex, fragment)
     if time:
         time = time.group(1)
-        return time
+        return int(time)
 
-    return None
+    return 0
 
 
 def get_seconds_from_time_str(time):
@@ -75,11 +75,10 @@ def add_source(url, title=None, thumbnail=None, provider=None):
 
 
 def add_snippet(audio_filepath, time, duration, source, user_id):
-    seconds = get_seconds_from_time_str(time)
-    clip_wav = files.create_wav_clip(audio_filepath, seconds, duration)
+    clip_wav = files.create_wav_clip(audio_filepath, time, duration)
     text = whisper_recognize(clip_wav)
     snippet = Snippet(
-        source_id=source.id, user_id=user_id, time=seconds, duration=duration, text=text
+        source_id=source.id, user_id=user_id, time=time, duration=duration, text=text
     )
     snippet.add_to_db()
 
@@ -91,12 +90,19 @@ def process_url(url, user_id, time, duration):
     thumbnail_path = None
     parsed_url = urlparse(url)
 
+    if not time:
+        if url_time := get_time_from_url(url):
+            time = url_time
+        else:
+            logging.warning("No time specified or found in url.")
+            time = 0
+
     base_url = get_url_without_query_params(url)
-    time = get_time_from_url(url)
     if Source.find_snippet(base_url, time, duration):
         logging.info("Snippet already exists. Skipping processing.")
         return
 
+    logging.debug(f"Processing url {base_url} at time {time} for duration {duration}")
     if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
         source, audio_filepath = process_youtube_link(url)
     elif parsed_url.hostname in ["pca.st"]:
@@ -105,10 +111,8 @@ def process_url(url, user_id, time, duration):
         audio_filepath = files.download_file(url)
         source = add_source(url, title=title, thumbnail=thumbnail_path)
 
-    if url_time := get_time_from_url(url):
-        time = url_time
-
-    add_snippet(audio_filepath, time, duration, source, user_id)
+    if source and audio_filepath:
+        add_snippet(audio_filepath, time, duration, source, user_id)
     files.cleanup_tmp_files()
 
 
@@ -144,7 +148,13 @@ def process_youtube_link(url):
 def process_pocketcast_link(url):
     r = requests.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
-    download_link = soup.find("a", {"class": "download-button"})["href"]
+    download_button = soup.find("a", {"class": "download-button"})
+    if not download_button:
+        logging.error("No download button found.")
+        # TODO This is a bad thing to return
+        return None, None
+
+    download_link = download_button["href"]
     audio_filepath = files.download_file(download_link)
 
     title = soup.find("meta", {"property": "og:title"})["content"]
