@@ -4,12 +4,12 @@ from datetime import timezone
 from typing import Optional
 
 import requests
-from dateutil.parser import parse
-from flask import url_for
+from dateutil.parser import parse as dateutil_parse
 
 from models import ExternalSyncRecord, User, UserSettings
 
-from . import source_processors, time_str
+from . import time_str
+from .source_processors import SnippetTask, is_source_supported, add_to_queue
 
 SETTING_TITLES = "readwise_titles"
 SETTING_TOKEN = "readwise_token"
@@ -17,28 +17,25 @@ SETTING_DURATION = "readwise_duration"
 readwise_url = "https://readwise.io/api/v2"
 
 
-class SnippetTask:
-    def __init__(self, url, user_id, time_seconds, duration_seconds):
-        self.url = url
-        self.time = time_seconds
-        self.duration = duration_seconds
-        self.user_id = user_id
-
-
-def request_readwise(user_id, method, path, query={}):
+def request_readwise(
+    user_id: int,
+    method: str,
+    path: str,
+    query: dict = {},
+) -> Optional[requests.Response]:
+    """
+    Makes a request to the Readwise API.
+    """
     try:
         token = get_readwise_token_from_db(user_id)
         headers = {"Authorization": f"Token {token}"}
         response = requests.request(
-            method,
-            f"{readwise_url}/{path}",
-            headers=headers,
-            params=query
+            method, f"{readwise_url}/{path}", headers=headers, params=query
         )
+        return response
     except Exception as e:
         logging.error(f"Failed to reach Readwise: {e}")
         return None
-    return response
 
 
 def get_readwise_token_from_db(user_id: int) -> Optional[str]:
@@ -48,19 +45,28 @@ def get_readwise_token_from_db(user_id: int) -> Optional[str]:
     return None
 
 
-def get_snippets_from_highlights(user_id, highlights, last_sync):
+def get_snippets_from_highlights(
+    user_id: int,
+    highlights: list[dict[str, str]],
+    last_sync: Optional[timezone] = None,
+) -> list[SnippetTask]:
+    """
+    Returns a list of SnippetTask objects from a list of Readwise highlights.
+    If last_sync is specified, only highlights after that date will be used.
+    """
     snippets = []
     for highlight in highlights:
-        if last_sync and parse(highlight["highlighted_at"]) < last_sync:
+        highlighted_at = dateutil_parse(highlight["highlighted_at"])
+        if last_sync and highlighted_at < last_sync:
             continue
 
         url = highlight["text"]
-        if not source_processors.is_source_supported(url):
+        if not is_source_supported(url):
             logging.warning(f"Skipping unsupported url: {url}")
             continue
 
         h_note = highlight.get("note", "")
-        default_duration = get_default_duration(user_id)
+        default_duration = get_default_duration_from_db(user_id)
         time, duration = time_str.parse_time_duration(h_note, default_duration)
         snippet = SnippetTask(url, user_id, time, duration)
         snippets.append(snippet)
@@ -77,7 +83,7 @@ def get_highlights_for_title(user_id, book_id):
     return results
 
 
-def get_default_duration(user_id):
+def get_default_duration_from_db(user_id):
     default_duration = UserSettings.find(user_id, SETTING_DURATION)
     if default_duration:
         default_duration = int(default_duration.value)
@@ -86,7 +92,7 @@ def get_default_duration(user_id):
     return default_duration
 
 
-def get_new_snippets(user_id, titles=[]):
+def get_new_snippets(user_id: int, titles: list[int]) -> list[SnippetTask]:
     logging.debug("Retrieving new highlights from Readwise")
 
     highlights = []
@@ -131,21 +137,13 @@ def get_all_titles(user_id):
     return response_json["results"]
 
 
-def batch_tasks_from_snippets(snippets):
-    tasks = []
-    for snippet in snippets:
-        tasks.append(snippet.__dict__)
-    return tasks
-
-
 def add_new_highlights_to_queue():
     users = User.get_all()
     for user in users:
         titles = get_sync_titles_from_db(user.id)
         snippets = get_new_snippets(user.id, titles)
         add_or_update_sync_record(user.id)
-        tasks = batch_tasks_from_snippets(snippets)
-        source_processors.add_batch_to_queue(tasks)
+        add_to_queue(snippets)
 
 
 def get_sync_titles_from_db(user_id):
@@ -159,7 +157,7 @@ def get_sync_titles_from_db(user_id):
 def save_sync_titles_to_db(user_id, titles):
     UserSettings.delete(user_id, SETTING_TITLES)
     for title in titles:
-        UserSettings.create(user_id,  SETTING_TITLES, title)
+        UserSettings.create(user_id, SETTING_TITLES, title)
 
 
 def timer_job():

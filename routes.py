@@ -150,7 +150,7 @@ def create_snippet():
     duration = request.form.get("duration", 60, type=int)
     time = request.form.get("time", 0)
     if current_user and current_user.is_authenticated:
-        source_processors.process_url(url, current_user.id, time, duration)
+        source_processors.process_snippet_task(url, current_user.id, time, duration)
         sources = Source.get_user_sources_snippets(current_user.id)
         return render_template("partials/sources.html", sources=sources)
     else:
@@ -250,5 +250,6 @@ def api_enqueue():
     time = request.args.get("time", 0)
     duration = request.args.get("duration", 60, type=int)
     user_id = Device.find_by_key(api_key).user_id
-    source_processors.add_to_queue(url, user_id, time, duration)
+    tasks = [source_processors.SnippetTask(url, user_id, time, duration)]
+    source_processors.add_to_queue(tasks)
     return "Success", 200

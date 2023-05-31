@@ -2,6 +2,7 @@ import re
 import uuid
 import time
 import logging
+from typing import Optional
 from queue import Queue
 from urllib.parse import parse_qs, urlparse
 
@@ -16,6 +17,14 @@ from config import Config
 
 r = sr.Recognizer()
 queue = Queue()
+
+
+class SnippetTask:
+    def __init__(self, url, user_id, time_seconds, duration_seconds):
+        self.url = url
+        self.time = time_seconds
+        self.duration = duration_seconds
+        self.user_id = user_id
 
 
 def is_source_supported(source_url):
@@ -95,9 +104,12 @@ def add_snippet(audio_filepath, time, duration, source, user_id):
     return text
 
 
-def process_url(url, user_id, time, duration):
-    title = None
-    thumbnail_path = None
+def process_snippet_task(task: SnippetTask):
+    url = task.url
+    user_id = task.user_id
+    time = task.time
+    duration = task.duration
+
     parsed_url = urlparse(url)
 
     if not time:
@@ -114,19 +126,18 @@ def process_url(url, user_id, time, duration):
 
     logging.debug(f"Processing url {base_url} at time {time} for duration {duration}")
     if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
-        source, audio_filepath = process_youtube_link(url)
+        yt_info = get_youtube_info(url)
+        audio_filepath = yt_info["audio_filepath"]
+        source = create_youtube_source(yt_info)
     elif parsed_url.hostname in ["pca.st"]:
         source, audio_filepath = process_pocketcast_link(url)
-    else:
-        audio_filepath = files.download_file(url)
-        source = add_source(url, title=title, thumbnail=thumbnail_path)
 
     if source and audio_filepath:
         add_snippet(audio_filepath, time, duration, source, user_id)
     files.cleanup_tmp_files()
 
 
-def process_youtube_link(url):
+def get_youtube_info(url: str) -> Optional[dict]:
     filename = uuid.uuid4()
     ydl_opts = {
         "format": "mp3/bestaudio/best",
@@ -144,20 +155,25 @@ def process_youtube_link(url):
         info_dict = ydl.extract_info(url, download=False)
         ydl.download([url])
 
-    if not info_dict:
-        logging.error("Could not extract info from youtube link.")
-        # TODO This is not a good thing to return, probably
-        return None, None
+    # TODO Might not always be mp3.
+    info_dict["audio_filepath"] = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
+    return info_dict
 
-    title = info_dict.get("title", "")
+
+def create_youtube_source(yt_info: dict) -> Source:
+    if not yt_info:
+        logging.warning("No youtube info given for creating source.")
+        return None
+
+    title = yt_info.get("title", "")
     # TODO: Use subtitles if avaialble, instead of audio
     # TODO: Include option to use automatic_captions
     # TODO: Include tags if available
     # TODO: Include source name (Veritasium, Daily Stoic, etc.)
-    audio_filepath = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
-    thumbnail = info_dict.get("thumbnail", "")
+    thumbnail = yt_info.get("thumbnail", "")
+    url = yt_info.get("original_url")
     source = add_source(url, title=title, thumbnail=thumbnail, provider="youtube")
-    return source, audio_filepath
+    return source
 
 
 def process_pocketcast_link(url):
@@ -184,16 +200,12 @@ def process_queue():
         time.sleep(1)
         if task := queue.get():
             logging.info("Starting queue job.")
-            process_url(task["url"], task["user_id"], task["time"], task["duration"])
+            process_snippet_task(task)
             queue.task_done()
             logging.info("Queue job complete.")
 
 
-def add_to_queue(url, user_id, time, duration):
-    logging.info(f"Adding {url} to queue")
-    queue.put({"url": url, "user_id": user_id, "time": time, "duration": duration})
-
-
-def add_batch_to_queue(tasks):
+def add_to_queue(tasks):
     for task in tasks:
-        add_to_queue(task["url"], task["user_id"], task["time"], task["duration"])
+        logging.info(f"Adding {task.url} to queue")
+        queue.put(task)
