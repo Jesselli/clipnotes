@@ -1,15 +1,15 @@
 <label for="readwise_titles" class="col-form-label col-sm-2">Titles</label>
 <div class="col-sm-10 overflow-y-scroll" style="height: 200px;" id="readwise_titles">
-    {% for title in readwise_titles %}
+    {% for readwise_title in readwise_titles %}
     <div class="form-check form-switch">
-        {% if title in readwise_sync_titles %}
+        {% if readwise_title.id in readwise_sync_titles %}
         <input hx-post="/settings" hx-trigger="click" class="form-check-input" hx-include="#readwise_titles"
-            type="checkbox" role="switch" name="readwise_titles" value="{{title}}" checked>
+            type="checkbox" role="switch" name="readwise_titles" value="{{readwise_title.id}}" checked>
         {% else %}
         <input hx-post="/settings" hx-trigger="click" class="form-check-input" hx-include="#readwise_titles"
-            type="checkbox" role="switch" name="readwise_titles" value="{{title}}">
+            type="checkbox" role="switch" name="readwise_titles" value="{{readwise_title.id}}">
         {% endif %}
-        <label class="form-check-label">{{title}}</label>
+        <label class="form-check-label">{{readwise_title.title}}</label>
     </div>
     {% endfor %}
 </div>

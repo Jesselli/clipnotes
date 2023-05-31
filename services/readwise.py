@@ -1,109 +1,107 @@
-import time
 import logging
+import time
 from datetime import timezone
+from typing import Optional
 
 import requests
 from dateutil.parser import parse
+from flask import url_for
 
 from models import ExternalSyncRecord, User, UserSettings
 
-from . import source_processors
+from . import source_processors, time_str
 
+SETTING_TITLES = "readwise_titles"
+SETTING_TOKEN = "readwise_token"
+SETTING_DURATION = "readwise_duration"
 readwise_url = "https://readwise.io/api/v2"
 
 
-# TODO Just reuse the existing snippet model?
-class Snippet:
-    def __init__(self, url, time_seconds=None, duration_seconds=None):
+class SnippetTask:
+    def __init__(self, url, user_id, time_seconds, duration_seconds):
         self.url = url
-        self.time_seconds = time_seconds
-        self.duration_seconds = duration_seconds
+        self.time = time_seconds
+        self.duration = duration_seconds
+        self.user_id = user_id
 
 
-def get_token_from_db(user_id):
-    user_settings = UserSettings.find(user_id, "readwise_token")
+def request_readwise(user_id, method, path, query={}):
+    try:
+        token = get_readwise_token_from_db(user_id)
+        headers = {"Authorization": f"Token {token}"}
+        response = requests.request(
+            method,
+            f"{readwise_url}/{path}",
+            headers=headers,
+            params=query
+        )
+    except Exception as e:
+        logging.error(f"Failed to reach Readwise: {e}")
+        return None
+    return response
+
+
+def get_readwise_token_from_db(user_id: int) -> Optional[str]:
+    user_settings = UserSettings.find(user_id, SETTING_TOKEN)
     if user_settings:
         return user_settings.value
     return None
 
 
-def time_to_seconds(note: str) -> int:
-    if not note:
-        return None
-    split_note = note.split(":")
-    if len(split_note) != 2:
-        return None
-    minutes = int(split_note[0])
-    seconds = int(split_note[1])
-    return (minutes * 60) + seconds
-
-
-def time_duration_from_note(note: str, default_duration: int) -> (int, int):
-    if not note:
-        return 0, default_duration
-
-    split_note = note.split("-")
-    if len(split_note) == 0:
-        return 0, default_duration
-    elif len(split_note) == 1:
-        return time_to_seconds(split_note[0]), default_duration
-
-    start = time_to_seconds(split_note[0])
-    end = time_to_seconds(split_note[1])
-    time = start + ((end - start) // 2)
-    duration = end - start
-    return time, duration
-
-
-def get_snippets_from_highlights(highlights, since, note, default_duration):
+def get_snippets_from_highlights(user_id, highlights, last_sync):
     snippets = []
     for highlight in highlights:
-        if since and parse(highlight["created_at"]) < since:
+        if last_sync and parse(highlight["highlighted_at"]) < last_sync:
             continue
-        h_note = highlight.get("note", "")
-        time, duration = time_duration_from_note(h_note, default_duration)
-        # TODO Make sure this is a supported url
+
         url = highlight["text"]
-        snippet = Snippet(url, time, duration)
+        if not source_processors.is_source_supported(url):
+            logging.warning(f"Skipping unsupported url: {url}")
+            continue
+
+        h_note = highlight.get("note", "")
+        default_duration = get_default_duration(user_id)
+        time, duration = time_str.parse_time_duration(h_note, default_duration)
+        snippet = SnippetTask(url, user_id, time, duration)
         snippets.append(snippet)
     return snippets
 
 
-def get_snippets_from_results(results, titles, note, since, default_duration):
-    snippets = []
-    for result in results:
-        r_title = result.get("title", "")
-        if r_title not in titles:
-            continue
-
-        highlights = result.get("highlights", [])
-        highlight_snippets = get_snippets_from_highlights(
-            highlights, since, note, default_duration
-        )
-        snippets.extend(highlight_snippets)
-    return snippets
-
-
-def get_snippets_from_new_highlights(user_id, titles=[], note=None):
-    logging.debug("Retrieving new highlights from Readwise")
-    token = get_token_from_db(user_id)
-    if not token:
-        logging.warning("No Readwise token found")
+def get_highlights_for_title(user_id, book_id):
+    query = {"book_id": book_id}
+    response = request_readwise(user_id, "GET", "highlights", query)
+    if not response:
         return []
-
-    headers = {"Authorization": f"Token {token}"}
-    response = requests.get(f"{readwise_url}/export", headers=headers)
     response_json = response.json()
     results = response_json["results"]
-    last_sync = get_utc_sync_datetime(user_id)
-    logging.debug(f"Last sync datetime: {last_sync}")
-    default_duration = UserSettings.find(user_id, "readwise_duration")
+    return results
+
+
+def get_default_duration(user_id):
+    default_duration = UserSettings.find(user_id, SETTING_DURATION)
     if default_duration:
         default_duration = int(default_duration.value)
     else:
         default_duration = 60
-    snippets = get_snippets_from_results(
-        results, titles, note, last_sync, default_duration
+    return default_duration
+
+
+def get_new_snippets(user_id, titles=[]):
+    logging.debug("Retrieving new highlights from Readwise")
+
+    highlights = []
+    for title in titles:
+        logging.debug(f"Syncing title: {title}")
+        title_highlights = get_highlights_for_title(user_id, title)
+        highlights.extend(title_highlights)
+
+    last_sync = get_utc_sync_datetime(user_id)
+    logging.debug(f"Last sync datetime: {last_sync}")
+
+    snippets = get_snippets_from_highlights(
+        user_id,
+        highlights,
+        last_sync,
     )
     logging.debug(f"Found {len(snippets)} new highlights")
     return snippets
@@ -126,58 +124,42 @@ def add_or_update_sync_record(user_id):
 
 def get_all_titles(user_id):
     titles = []
-    token = get_token_from_db(user_id)
-    if not token:
+    response = request_readwise(user_id, "GET", "books")
+    if not response:
         return titles
-    headers = {"Authorization": f"Token {token}"}
-    response = requests.get(f"{readwise_url}/export", headers=headers)
     response_json = response.json()
-    results = response_json["results"]
-    for result in results:
-        titles.append(result["title"])
-    return titles
+    return response_json["results"]
 
 
-def batch_tasks_from_snippets(snippets, user_id):
+def batch_tasks_from_snippets(snippets):
     tasks = []
     for snippet in snippets:
-        tasks.append(
-            {
-                "url": snippet.url,
-                "user_id": user_id,
-                "time": snippet.time_seconds,
-                "duration": snippet.duration_seconds,
-            }
-        )
+        tasks.append(snippet.__dict__)
     return tasks
 
 
 def add_new_highlights_to_queue():
     users = User.get_all()
     for user in users:
-        # TODO: Don't use string literals for settings names
         titles = get_sync_titles_from_db(user.id)
-        note = UserSettings.find(user.id, "readwise_notes")
-        if note:
-            note = note.value
-        snippets = get_snippets_from_new_highlights(user.id, titles, note)
+        snippets = get_new_snippets(user.id, titles)
         add_or_update_sync_record(user.id)
-        tasks = batch_tasks_from_snippets(snippets, user.id)
+        tasks = batch_tasks_from_snippets(snippets)
         source_processors.add_batch_to_queue(tasks)
 
 
 def get_sync_titles_from_db(user_id):
-    title_settings = UserSettings.find_all(user_id, "readwise_titles")
+    title_settings = UserSettings.find_all(user_id, SETTING_TITLES)
     titles = []
     for title_setting in title_settings:
-        titles.append(title_setting.value)
+        titles.append(int(title_setting.value))
     return titles
 
 
 def save_sync_titles_to_db(user_id, titles):
-    UserSettings.delete(user_id, "readwise_titles")
+    UserSettings.delete(user_id, SETTING_TITLES)
     for title in titles:
-        UserSettings.create(user_id, "readwise_titles", title)
+        UserSettings.create(user_id,  SETTING_TITLES, title)
 
 
 def timer_job():

@@ -18,6 +18,16 @@ r = sr.Recognizer()
 queue = Queue()
 
 
+def is_source_supported(source_url):
+    parsed_url = urlparse(source_url)
+    if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
+        return True
+    elif parsed_url.hostname in ["pca.st"]:
+        return True
+    else:
+        return False
+
+
 def get_time_from_url(url: str) -> int:
     parsed_url = urlparse(url)
     params = parse_qs(parsed_url.query)
@@ -133,6 +143,11 @@ def process_youtube_link(url):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info_dict = ydl.extract_info(url, download=False)
         ydl.download([url])
+
+    if not info_dict:
+        logging.error("Could not extract info from youtube link.")
+        # TODO This is not a good thing to return, probably
+        return None, None
 
     title = info_dict.get("title", "")
     # TODO: Use subtitles if avaialble, instead of audio
