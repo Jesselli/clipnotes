@@ -206,6 +206,7 @@ def process_queue():
 
 
 def add_to_queue(tasks):
+    # TODO MOVE THE QUEUE TO THE DB 
     for task in tasks:
         logging.info(f"Adding {task.url} to queue")
         queue.put(task)

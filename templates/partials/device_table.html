@@ -1,3 +1,23 @@
+<!-- <script>
+    function closeModal() {
+        var container = document.getElementById("modals-here")
+        var backdrop = document.getElementById("modal-backdrop")
+        var modal = document.getElementById("modal")
+
+        modal.classList.remove("show")
+        backdrop.classList.remove("show")
+
+        setTimeout(function () {
+            container.removeChild(backdrop)
+            container.removeChild(modal)
+        }, 200)
+    }
+</script>
+{% if new_device_key %} -->
+<!-- <div id="modals-here"> -->
+<!-- <div id="modal-backdrop" class="modal-backdrop"></div> -->
+<!-- </div> -->
+<!-- {% endif %} -->
 <table class="table">
     <thead>
         <tr>
@@ -24,7 +44,7 @@
             {{ device.device_name }}
         </td>
         <td>
-            {{ device.device_key }}
+            ********************{{ device.last_four }}
         </td>
         <td>
             <i hx-trigger="click" hx-delete="/devices/{{loop.index}}" hx-target="closest tr" hx-confirm="Are you sure?"

@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import and_
+from werkzeug.security import check_password_hash
 
 db = SQLAlchemy()
 Session = scoped_session(sessionmaker())
@@ -255,18 +256,28 @@ class Device(db.Model, BaseModel):
     device_name = db.Column(db.String(80), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     device_key = db.Column(db.String(80), nullable=False)
+    last_four = db.Column(db.String(4), nullable=False)
 
-    @classmethod
-    def find_by_name(cls, device_name):
-        return Session.query(Device).filter_by(device_name=device_name).first()
+    @staticmethod
+    def find_by_name(user_id, device_name):
+        return (
+            Session.query(Device)
+            .filter_by(user_id=user_id, device_name=device_name)
+            .first()
+        )
 
     @classmethod
     def find_devices_for_user(cls, user_id):
         return Session.query(Device).filter_by(user_id=user_id).all()
 
-    @classmethod
-    def find_by_key(cls, device_key):
-        return Session.query(Device).filter_by(device_key=device_key).first()
+    @staticmethod
+    def find_by_key(device_key):
+        # TODO With a ton of devices, this will not be efficient
+        devices = Session.query(Device).all()
+        for device in devices:
+            if check_password_hash(device.device_key, device_key):
+                return device
+        return None
 
     @classmethod
     def find_by_id(cls, device_id):

@@ -1,5 +1,22 @@
 {% extends "shared/_layout.html" %}
 {% block main_content %}
+<div class="modal" id="newKeyModal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5">New Device Key</h1>
+                <!-- <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button> -->
+            </div>
+            <div class="modal-body">
+                <p>For security purposes, this key will only be displayed once. Please store it in a safe place.</p>
+                <div id="newDeviceKey"></div>
+            </div>
+            <div class="modal-footer">
+                <button hx-get="/devices/table" hx-target="#device-table" type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-8 offset-md-2 mt-5">
@@ -8,7 +25,7 @@
                     <h1 class="text-center">Device Keys</h1>
                 </div>
                 <div class="card-body" id="device-table">
-                {{render_partial("partials/device_table.html", devices=devices)}}
+                    {{render_partial("partials/device_table.html", devices=devices)}}
                 </div>
             </div>
         </div>
@@ -18,13 +35,14 @@
                     <h1 class="text-center">Add Device Key</h1>
                 </div>
                 <div class="card-body">
-                    <form hx-post="/devices" hx-target="#device-table">
+                    <form hx-post="/devices" hx-target="#newDeviceKey" hx-swap="innerHTML">
                         <div class="mb-3">
                             <label for="device_name" class="form-label">Device Name</label>
                             <input type="text" id="device_name" name="device_name" class="form-control" required>
                         </div>
                         <div class="mb-3">
-                            <button type="submit" class="btn btn-primary">Add Device</button>
+                            <button type="submit" class="btn btn-primary" data-bs-toggle="modal"
+                                data-bs-target="#newKeyModal">Add Device</button>
                         </div>
                     </form>
                 </div>

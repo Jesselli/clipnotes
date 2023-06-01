@@ -184,19 +184,29 @@ def get_devices():
 
 @main.post("/devices")
 def add_device():
+    user_id = current_user.id
     if request.form:
         name = request.form.get("device_name")
-    if Device.find_by_name(name):
+    if Device.find_by_name(user_id, name):
         return "Device already exists", 400
 
-    if current_user and current_user.is_authenticated:
-        device_key = uuid.uuid4().hex
-        new_device = Device(
-            device_name=name, user_id=current_user.id, device_key=device_key
-        )
-        new_device.add_to_db()
+    device_key = uuid.uuid4().hex
+    device_key_hashed = generate_password_hash(device_key)
+    new_device = Device(
+        device_name=name,
+        user_id=current_user.id,
+        device_key=device_key_hashed,
+        last_four=f"{'*'*20}{device_key[-4:]}",
+    )
+    new_device.add_to_db()
+    # TODO Move this into a tiny partial template?
+    return f'<input style="font-weight:bold;" class="form-control border-danger" value="{device_key}">'
 
-    devices = Device.find_devices_for_user(current_user.id)
+
+@main.get("/devices/table")
+def get_device_table():
+    user_id = current_user.id
+    devices = Device.find_devices_for_user(user_id)
     return render_template("partials/device_table.html", devices=devices)
 
 
@@ -213,6 +223,7 @@ def delete_device(device_id):
 @api.get("/source/<int:source_id>/markdown")
 def api_get_source_markdown(source_id):
     api_key = request.headers.get("X-Api-Key")
+
     user_id = Device.find_by_key(api_key).user_id
     get_latest = request.args.get("latest", default=False, type=bool)
     exclusions = request.args.get("exclude", [])
@@ -247,7 +258,7 @@ def api_get_sources():
 def api_enqueue():
     api_key = request.headers.get("X-Api-Key")
     url = request.args.get("url")
-    time = request.args.get("time", 0)
+    time = request.args.get("time", 0, type=int)
     duration = request.args.get("duration", 60, type=int)
     user_id = Device.find_by_key(api_key).user_id
     tasks = [source_processors.SnippetTask(url, user_id, time, duration)]
