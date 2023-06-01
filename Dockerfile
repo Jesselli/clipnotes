@@ -8,4 +8,4 @@ COPY . /app
 RUN mkdir instance
 RUN flask create-db
 ENTRYPOINT [ "waitress-serve" ]
-CMD [ "--call", "app:create_app"]
+CMD [ "--call", "app:create_app", "--port", "80"]
