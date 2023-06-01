@@ -92,6 +92,15 @@ class Source(db.Model, BaseModel):
     def find_by_id(cls, source_id):
         return Session.query(Source).filter_by(id=source_id).first()
 
+    @classmethod
+    def find_snippet(cls, url, time, duration):
+        filter = and_(
+            Snippet.source_id == Source.id,
+            Snippet.time == time,
+            Snippet.duration == duration,
+        )
+        return Session.query(Source).filter_by(url=url).filter(filter).first()
+
 
 @dataclass
 class SyncRecord(db.Model, BaseModel):
@@ -128,6 +137,45 @@ class SyncRecord(db.Model, BaseModel):
         Session.commit()
 
 
+class ExternalSyncRecord(db.Model, BaseModel):
+    id: int
+    user_id: int
+    service: str
+    synced_at: str
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    service = db.Column(db.String(255), nullable=False)
+    synced_at = db.Column(db.DateTime, default=db.func.now())
+
+    def update_sync_time(self, time=db.func.now()):
+        self.synced_at = time
+        Session.commit()
+
+    @classmethod
+    def find_by_user_service(cls, user_id, service):
+        record = (
+            Session.query(ExternalSyncRecord)
+            .filter_by(user_id=user_id, service=service)
+            .first()
+        )
+        return record
+
+    @staticmethod
+    def get_readwise_sync_record(user_id):
+        return ExternalSyncRecord.find_by_user_service(user_id, "readwise")
+
+    @staticmethod
+    def add_readwise_sync_record(user_id):
+        sync_record = ExternalSyncRecord(user_id=user_id, service="readwise")
+        sync_record.add_to_db()
+
+    @staticmethod
+    def update_readwise_sync_record(user_id):
+        sync_record = ExternalSyncRecord.find_by_user_service(user_id, "readwise")
+        sync_record.update_sync_time()
+
+
 @dataclass
 class User(db.Model, UserMixin, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
@@ -138,6 +186,10 @@ class User(db.Model, UserMixin, BaseModel):
 
     def __repr__(self):
         return f"<User {self.id} - {self.name}>"
+
+    @classmethod
+    def get_all(cls):
+        return Session.query(User).all()
 
     @classmethod
     def create(cls, email, password):
@@ -158,23 +210,43 @@ class User(db.Model, UserMixin, BaseModel):
 class UserSettings(db.Model, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    setting_name = db.Column(db.String(80), nullable=False)
-    setting_value = db.Column(db.String(80), nullable=False)
+    name = db.Column(db.String(80), nullable=False)
+    value = db.Column(db.String(80), nullable=False)
 
-    @classmethod
-    def find_by_user_id(cls, user_id):
+    @staticmethod
+    def create(user_id, setting_name, value):
+        setting = UserSettings(user_id=user_id, name=setting_name, value=value)
+        setting.add_to_db()
+
+    @staticmethod
+    def find_by_user_id(user_id):
         return Session.query(UserSettings).filter_by(user_id=user_id).all()
 
-    @classmethod
-    def find_by_user_and_setting_name(cls, user_id, setting_name):
+    @staticmethod
+    def find(user_id, setting_name):
         return (
             Session.query(UserSettings)
-            .filter_by(user_id=user_id, setting_name=setting_name)
+            .filter_by(user_id=user_id, name=setting_name)
             .first()
         )
 
+    @staticmethod
+    def find_all(user_id, setting_name):
+        return (
+            Session.query(UserSettings)
+            .filter_by(user_id=user_id, name=setting_name)
+            .all()
+        )
+
+    @staticmethod
+    def delete(user_id, setting_name):
+        Session.query(UserSettings).filter_by(
+            user_id=user_id, name=setting_name
+        ).delete()
+        Session.commit()
+
     def update_value(self, value):
-        self.setting_value = value
+        self.value = value
         Session.commit()
 
 

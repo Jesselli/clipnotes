@@ -83,6 +83,8 @@ pycryptodomex==3.17
     # via yt-dlp
 pydub==0.25.1
     # via -r requirements.in
+python-dateutil==2.8.2
+    # via -r requirements.in
 regex==2023.5.5
     # via tiktoken
 requests==2.30.0
@@ -91,7 +93,9 @@ requests==2.30.0
     #   speechrecognition
     #   tiktoken
 six==1.16.0
-    # via flask-cors
+    # via
+    #   flask-cors
+    #   python-dateutil
 soundfile==0.12.1
     # via -r requirements.in
 soupsieve==2.4.1

@@ -1,4 +1,5 @@
 import os
+import logging
 from threading import Thread
 
 import jinja_partials
@@ -9,10 +10,22 @@ from sqlalchemy import create_engine
 
 from models import Session, User, db
 from routes import api, main
-from services import source_processors
+from services import readwise, source_processors
 
 app = Flask(__name__)
 CORS(app)
+
+queue_thread = Thread(target=source_processors.process_queue)
+queue_thread.daemon = True
+queue_thread.start()
+
+external_sync_thread = Thread(target=readwise.timer_job)
+external_sync_thread.daemon = True
+external_sync_thread.start()
+
+# TODO Configurable logging level
+log_format = "%(asctime)s %(levelname)s - %(message)s"
+logging.basicConfig(filename="instance/clipnotes.log", format=log_format, level=logging.DEBUG)
 
 
 def config_app():
@@ -37,10 +50,6 @@ def drop_db():
 
 
 def create_app():
-    queue_thread = Thread(target=source_processors.process_queue)
-    queue_thread.daemon = True
-    queue_thread.start()
-
     login_manager = LoginManager()
     login_manager.login_view = "main.login"
     login_manager.init_app(app)
@@ -57,6 +66,7 @@ def create_app():
     app.register_blueprint(api)
     db.init_app(app)
     jinja_partials.register_extensions(app)
+
     return app
 
 

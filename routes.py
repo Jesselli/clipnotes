@@ -13,7 +13,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from models import Device, Snippet, Source, SyncRecord, User, UserSettings
-from services import source_processors
+from services import readwise, source_processors
 from services.markdown import generate_source_markdown
 
 main = Blueprint("main", __name__)
@@ -60,6 +60,7 @@ def login_post():
     return render_template("partials/login_form.html")
 
 
+# TODO Cleanup the UserSettings code in routes.py
 @main.get("/settings")
 @login_required
 def get_settings():
@@ -67,22 +68,40 @@ def get_settings():
     user_settings = UserSettings.find_by_user_id(user_id)
     settings = {}
     for user_setting in user_settings:
-        settings[user_setting.setting_name] = user_setting.setting_value
+        settings[user_setting.name] = user_setting.value
     return render_template("settings.html", settings=settings)
+
+
+@main.get("/readwise/titles")
+def get_readwise_titles():
+    user_id = current_user.id
+    readwise_titles = readwise.get_all_titles(user_id)
+    readwise_sync_titles = readwise.get_sync_titles_from_db(user_id)
+    return render_template(
+        "partials/readwise_titles.html",
+        readwise_titles=readwise_titles,
+        readwise_sync_titles=readwise_sync_titles,
+    )
 
 
 @main.post("/settings")
 def post_settings():
     user_id = current_user.id
+    if "readwise_titles" in request.form:
+        readwise_titles = request.form.getlist("readwise_titles")
+        readwise.save_sync_titles_to_db(user_id, readwise_titles)
+
     for setting_name in request.form:
-        existing_setting = UserSettings.find_by_user_and_setting_name(user_id, setting_name)
+        if setting_name == "readwise_titles":
+            continue
+
+        existing_setting = UserSettings.find(user_id, setting_name)
         value = request.form.get(setting_name)
         if existing_setting:
             existing_setting.update_value(value)
         else:
-            new_setting = UserSettings(user_id=user_id, setting_name=setting_name, setting_value=value)
-            new_setting.add_to_db()
-    return "Success",  200
+            UserSettings.create(user_id, setting_name, value)
+    return render_template("partials/readwise_settings.html", settings=request.form)
 
 
 @main.post("/register")
@@ -131,7 +150,7 @@ def create_snippet():
     duration = request.form.get("duration", 60, type=int)
     time = request.form.get("time", 0)
     if current_user and current_user.is_authenticated:
-        source_processors.process_url(url, current_user.id, time, duration)
+        source_processors.process_snippet_task(url, current_user.id, time, duration)
         sources = Source.get_user_sources_snippets(current_user.id)
         return render_template("partials/sources.html", sources=sources)
     else:
@@ -231,5 +250,6 @@ def api_enqueue():
     time = request.args.get("time", 0)
     duration = request.args.get("duration", 60, type=int)
     user_id = Device.find_by_key(api_key).user_id
-    source_processors.add_to_queue(url, user_id, time, duration)
+    tasks = [source_processors.SnippetTask(url, user_id, time, duration)]
+    source_processors.add_to_queue(tasks)
     return "Success", 200
