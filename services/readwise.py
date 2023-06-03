@@ -6,10 +6,10 @@ from typing import Optional
 import requests
 from dateutil.parser import parse as dateutil_parse
 
-from models import ExternalSyncRecord, User, UserSettings
+from models import ExternalSyncRecord, User, UserSettings, SnippetQueue
 
 from . import time_str
-from .source_processors import SnippetTask, is_source_supported, add_to_queue
+from .source_processors import is_source_supported
 
 SETTING_TITLES = "readwise_titles"
 SETTING_TOKEN = "readwise_token"
@@ -45,34 +45,6 @@ def get_readwise_token_from_db(user_id: int) -> Optional[str]:
     return None
 
 
-def get_snippets_from_highlights(
-    user_id: int,
-    highlights: list[dict[str, str]],
-    last_sync: Optional[timezone] = None,
-) -> list[SnippetTask]:
-    """
-    Returns a list of SnippetTask objects from a list of Readwise highlights.
-    If last_sync is specified, only highlights after that date will be used.
-    """
-    snippets = []
-    for highlight in highlights:
-        highlighted_at = dateutil_parse(highlight["highlighted_at"])
-        if last_sync and highlighted_at < last_sync:
-            continue
-
-        url = highlight["text"]
-        if not is_source_supported(url):
-            logging.warning(f"Skipping unsupported url: {url}")
-            continue
-
-        h_note = highlight.get("note", "")
-        default_duration = get_default_duration_from_db(user_id)
-        time, duration = time_str.parse_time_duration(h_note, default_duration)
-        snippet = SnippetTask(url, user_id, time, duration)
-        snippets.append(snippet)
-    return snippets
-
-
 def get_highlights_for_title(user_id, book_id):
     query = {"book_id": book_id}
     response = request_readwise(user_id, "GET", "highlights", query)
@@ -86,14 +58,18 @@ def get_highlights_for_title(user_id, book_id):
 def get_default_duration_from_db(user_id):
     default_duration = UserSettings.find(user_id, SETTING_DURATION)
     if default_duration:
+        # TODO Why do we have to cast this to int?
         default_duration = int(default_duration.value)
     else:
         default_duration = 60
     return default_duration
 
 
-def get_new_snippets(user_id: int, titles: list[int]) -> list[SnippetTask]:
+def enqueue_new_snippets(user_id: int, titles: list[int]):
     logging.debug("Retrieving new highlights from Readwise")
+
+    last_sync = get_utc_sync_datetime(user_id)
+    logging.debug(f"Last sync datetime: {last_sync}")
 
     highlights = []
     for title in titles:
@@ -101,16 +77,21 @@ def get_new_snippets(user_id: int, titles: list[int]) -> list[SnippetTask]:
         title_highlights = get_highlights_for_title(user_id, title)
         highlights.extend(title_highlights)
 
-    last_sync = get_utc_sync_datetime(user_id)
-    logging.debug(f"Last sync datetime: {last_sync}")
+    for highlight in highlights:
+        highlighted_at = dateutil_parse(highlight["highlighted_at"])
+        if last_sync and highlighted_at < last_sync:
+            continue
 
-    snippets = get_snippets_from_highlights(
-        user_id,
-        highlights,
-        last_sync,
-    )
-    logging.debug(f"Found {len(snippets)} new highlights")
-    return snippets
+        url = highlight["text"]
+        if not is_source_supported(url):
+            logging.warning(f"Skipping unsupported url: {url}")
+            continue
+
+        h_note = highlight.get("note", "")
+        default_duration = get_default_duration_from_db(user_id)
+        # TODO Stop using notes. I guess this needs to go in the description.
+        time, duration = time_str.parse_time_duration(h_note, default_duration)
+        SnippetQueue.add(user_id, url, time, duration)
 
 
 def get_utc_sync_datetime(user_id):
@@ -141,9 +122,8 @@ def add_new_highlights_to_queue():
     users = User.get_all()
     for user in users:
         titles = get_sync_titles_from_db(user.id)
-        snippets = get_new_snippets(user.id, titles)
+        enqueue_new_snippets(user.id, titles)
         add_or_update_sync_record(user.id)
-        add_to_queue(snippets)
 
 
 def get_sync_titles_from_db(user_id):

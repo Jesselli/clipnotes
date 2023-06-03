@@ -25,13 +25,17 @@ external_sync_thread.start()
 
 # TODO Configurable logging level
 log_format = "%(asctime)s %(levelname)s - %(message)s"
-logging.basicConfig(filename="instance/clipnotes.log", format=log_format, level=logging.DEBUG)
+logging.basicConfig(
+    filename="instance/clipnotes.log",
+    format=log_format,
+    level=logging.DEBUG,
+)
 
 
 def config_app():
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    db_path = os.path.join(app.instance_path, "snippets.db")
+    db_path = os.path.join(app.instance_path, "clipnotes.db")
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 
 
@@ -72,4 +76,5 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
+    app.config["SECRET_KEY"] = "test"
     app.run("0.0.0.0", debug=True)

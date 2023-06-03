@@ -1,4 +1,6 @@
+import logging
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -6,8 +8,15 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import and_
 from werkzeug.security import check_password_hash
 
+from services import time_str
+
 db = SQLAlchemy()
 Session = scoped_session(sessionmaker())
+
+
+def url_without_query(url):
+    parsed_url = urlparse(url)
+    return f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
 
 
 class BaseModel:
@@ -20,6 +29,10 @@ class BaseModel:
     def delete_from_db(self):
         Session.delete(self)
         Session.commit()
+
+    @classmethod
+    def find_by_id(cls, id):
+        return Session.query(cls).get(id)
 
 
 @dataclass
@@ -35,17 +48,13 @@ class Snippet(db.Model, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     source_id = db.Column(db.Integer, db.ForeignKey("source.id"), nullable=False)
-    time = db.Column(db.Integer, nullable=False)
-    duration = db.Column(db.Integer, nullable=False)
+    time = db.Column(db.Integer, nullable=False, default=0)
+    duration = db.Column(db.Integer, nullable=False, default=60)
     created_at = db.Column(db.DateTime, default=db.func.now())
     text = db.Column(db.Text, nullable=False)
 
     def __repr__(self):
         return f"<Snippet {self.id} - {self.text}>"
-
-    @classmethod
-    def find_by_id(cls, snippet_id):
-        return Session.query(Snippet).filter_by(id=snippet_id).first()
 
     @classmethod
     def get_snippets_since(cls, source_id, since):
@@ -73,6 +82,13 @@ class Source(db.Model, BaseModel):
     thumb_url = db.Column(db.String(255))
     provider = db.Column(db.String(255))
 
+    def __init__(self, url, title, thumb_url, provider):
+        url = url_without_query(url)
+        self.url = url
+        self.title = title
+        self.thumb_url = thumb_url
+        self.provider = provider
+
     def __repr__(self):
         return f"<Source {self.id} - {self.title}>"
 
@@ -90,17 +106,19 @@ class Source(db.Model, BaseModel):
         return sources
 
     @classmethod
-    def find_by_id(cls, source_id):
-        return Session.query(Source).filter_by(id=source_id).first()
-
-    @classmethod
     def find_snippet(cls, url, time, duration):
+        url = url_without_query(url)
         filter = and_(
             Snippet.source_id == Source.id,
             Snippet.time == time,
             Snippet.duration == duration,
         )
         return Session.query(Source).filter_by(url=url).filter(filter).first()
+
+    @staticmethod
+    def find_by_url(url):
+        url = url_without_query(url)
+        return Session.query(Source).filter_by(url=url).first()
 
 
 @dataclass
@@ -279,6 +297,40 @@ class Device(db.Model, BaseModel):
                 return device
         return None
 
-    @classmethod
-    def find_by_id(cls, device_id):
-        return Session.query(Device).get(device_id)
+
+class SnippetQueue(db.Model, BaseModel):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    url = db.Column(db.String(255), nullable=False)
+    time = db.Column(db.Integer, nullable=False, default=0)
+    duration = db.Column(db.Integer, nullable=False, default=60)
+    status = db.Column(db.String(255), default="queued")
+    created_at = db.Column(db.DateTime, default=db.func.now())
+
+    @staticmethod
+    def add(user_id, url, time, duration):
+        logging.debug(f"Adding snippet to queue: {url}")
+
+        if (time is None) and (url_time := time_str.get_time_from_url(url)):
+            time = url_time
+
+        snippet = SnippetQueue(
+            user_id=user_id,
+            url=url,
+            time=time,
+            duration=duration,
+        )
+        snippet.add_to_db()
+
+    @staticmethod
+    def get_next_item():
+        return (
+            Session.query(SnippetQueue)
+            .filter_by(status="queued")
+            .order_by(SnippetQueue.created_at)
+            .first()
+        )
+
+    def update_status(self, status):
+        self.status = status
+        Session.commit()

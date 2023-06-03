@@ -12,7 +12,7 @@ from flask import (
 from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Device, Snippet, Source, SyncRecord, User, UserSettings
+import models as db
 from services import readwise, source_processors
 from services.markdown import generate_source_markdown
 
@@ -40,7 +40,7 @@ def logout():
 @main.get("/")
 @login_required
 def index():
-    sources = Source.get_user_sources_snippets(current_user.id)
+    sources = db.Source.get_user_sources_snippets(current_user.id)
     return render_template("index.html", sources=sources)
 
 
@@ -49,7 +49,7 @@ def login_post():
     if request.form:
         username = request.form["email"]
         password = request.form["password"]
-        user = User.find_by_email(username)
+        user = db.User.find_by_email(username)
         if user and check_password_hash(user.password, password):
             login_user(user)
             response = Response("Logged in", 200)
@@ -65,7 +65,7 @@ def login_post():
 @login_required
 def get_settings():
     user_id = current_user.id
-    user_settings = UserSettings.find_by_user_id(user_id)
+    user_settings = db.UserSettings.find_by_user_id(user_id)
     settings = {}
     for user_setting in user_settings:
         settings[user_setting.name] = user_setting.value
@@ -95,13 +95,17 @@ def post_settings():
         if setting_name == "readwise_titles":
             continue
 
-        existing_setting = UserSettings.find(user_id, setting_name)
+        existing_setting = db.UserSettings.find(user_id, setting_name)
         value = request.form.get(setting_name)
         if existing_setting:
             existing_setting.update_value(value)
         else:
-            UserSettings.create(user_id, setting_name, value)
-    return render_template("partials/readwise_settings.html", settings=request.form)
+            db.UserSettings.create(user_id, setting_name, value)
+
+    return render_template(
+        "partials/readwise_settings.html",
+        settings=request.form,
+    )
 
 
 @main.post("/register")
@@ -114,12 +118,12 @@ def register_user():
     email = request.form["email"]
     password_hash = generate_password_hash(password)
 
-    user = User.find_by_email(email)
+    user = db.User.find_by_email(email)
     if user:
         flash("User already exists.", "danger")
         return render_template("partials/register_form.html")
 
-    User.create(email, password_hash)
+    db.User.create(email, password_hash)
     flash("User created. Please login.", "success")
     response = Response("success", 200)
     response.headers["HX-Redirect"] = "/login"
@@ -135,7 +139,7 @@ def get_source_markdown(source_id):
 
 @main.delete("/source/<int:source_id>")
 def delete_source(source_id):
-    source = Source.find_by_id(source_id)
+    source = db.Source.find_by_id(source_id)
     snippets = source.snippets
     for snippet in snippets:
         snippet.delete_from_db()
@@ -143,6 +147,7 @@ def delete_source(source_id):
     return ""
 
 
+# TODO This should work differently. Everything should be enqueued.
 @main.post("/snippets")
 def create_snippet():
     sources = []
@@ -150,8 +155,13 @@ def create_snippet():
     duration = request.form.get("duration", 60, type=int)
     time = request.form.get("time", 0)
     if current_user and current_user.is_authenticated:
-        source_processors.process_snippet_task(url, current_user.id, time, duration)
-        sources = Source.get_user_sources_snippets(current_user.id)
+        source_processors.process_snippet_task(
+            url,
+            current_user.id,
+            time,
+            duration,
+        )
+        sources = db.Source.get_user_sources_snippets(current_user.id)
         return render_template("partials/sources.html", sources=sources)
     else:
         return "Not authenticated"
@@ -160,14 +170,14 @@ def create_snippet():
 @main.put("/snippet/<int:snippet_id>")
 def update_snippet(snippet_id):
     text = request.form.get("text")
-    snippet = Snippet.find_by_id(snippet_id)
+    snippet = db.Snippet.find_by_id(snippet_id)
     snippet.update_text_in_db(text)
     return text
 
 
 @main.delete("/snippet/<int:snippet_id>")
 def delete_snippet(snippet_id):
-    snippet = Snippet.find_by_id(snippet_id)
+    snippet = db.Snippet.find_by_id(snippet_id)
     snippet.delete_from_db()
     return ""
 
@@ -178,7 +188,7 @@ def get_devices():
     if current_user and current_user.is_authenticated:
         user_id = current_user.id
 
-    devices = Device.find_devices_for_user(user_id)
+    devices = db.Device.find_devices_for_user(user_id)
     return render_template("devices.html", devices=devices)
 
 
@@ -187,12 +197,12 @@ def add_device():
     user_id = current_user.id
     if request.form:
         name = request.form.get("device_name")
-    if Device.find_by_name(user_id, name):
+    if db.Device.find_by_name(user_id, name):
         return "Device already exists", 400
 
     device_key = uuid.uuid4().hex
     device_key_hashed = generate_password_hash(device_key)
-    new_device = Device(
+    new_device = db.Device(
         device_name=name,
         user_id=current_user.id,
         device_key=device_key_hashed,
@@ -206,13 +216,13 @@ def add_device():
 @main.get("/devices/table")
 def get_device_table():
     user_id = current_user.id
-    devices = Device.find_devices_for_user(user_id)
+    devices = db.Device.find_devices_for_user(user_id)
     return render_template("partials/device_table.html", devices=devices)
 
 
 @main.delete("/devices/<int:device_id>")
 def delete_device(device_id):
-    device = Device.find_by_id(device_id)
+    device = db.Device.find_by_id(device_id)
     device.delete_from_db()
     return ""
 
@@ -224,7 +234,7 @@ def delete_device(device_id):
 def api_get_source_markdown(source_id):
     api_key = request.headers.get("X-Api-Key")
 
-    user_id = Device.find_by_key(api_key).user_id
+    user_id = db.Device.find_by_key(api_key).user_id
     get_latest = request.args.get("latest", default=False, type=bool)
     exclusions = request.args.get("exclude", [])
     return generate_source_markdown(
@@ -235,12 +245,12 @@ def api_get_source_markdown(source_id):
 @api.post("/source/<int:source_id>/sync")
 def api_update_sync(source_id):
     api_key = request.headers.get("X-Api-Key")
-    user_id = Device.find_by_key(api_key).user_id
-    sync_record = SyncRecord.find_by_user_source(user_id, source_id)
+    user_id = db.Device.find_by_key(api_key).user_id
+    sync_record = db.SyncRecord.find_by_user_source(user_id, source_id)
     if sync_record:
         sync_record.update_sync_time()
     else:
-        sync_record = SyncRecord(user_id=user_id, source_id=source_id)
+        sync_record = db.SyncRecord(user_id=user_id, source_id=source_id)
         sync_record.add_to_db()
     return jsonify(sync_record)
 
@@ -249,8 +259,8 @@ def api_update_sync(source_id):
 def api_get_sources():
     # TODO Better parsing of args -- failure states
     api_key = request.headers.get("X-Api-Key")
-    user_id = Device.find_by_key(api_key).user_id
-    sources = Source.get_user_sources_snippets(user_id)
+    user_id = db.Device.find_by_key(api_key).user_id
+    sources = db.Source.get_user_sources_snippets(user_id)
     return jsonify(sources)
 
 
@@ -258,9 +268,8 @@ def api_get_sources():
 def api_enqueue():
     api_key = request.headers.get("X-Api-Key")
     url = request.args.get("url")
-    time = request.args.get("time", 0, type=int)
-    duration = request.args.get("duration", 60, type=int)
-    user_id = Device.find_by_key(api_key).user_id
-    tasks = [source_processors.SnippetTask(url, user_id, time, duration)]
-    source_processors.add_to_queue(tasks)
+    time = request.args.get("time", type=int)
+    duration = request.args.get("duration", type=int)
+    user_id = db.Device.find_by_key(api_key).user_id
+    db.SnippetQueue.add(user_id, url, time, duration)
     return "Success", 200
