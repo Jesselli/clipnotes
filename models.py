@@ -336,6 +336,16 @@ class SnippetQueue(db.Model, BaseModel):
 
     @staticmethod
     def get_next_item():
+        # TODO Make MAX_CONCURRENT_JOBS configurable
+        MAX_CONCURRENT_JOBS = 1
+        filter = and_(
+            SnippetQueue.status != QueueItemStatus.DONE,
+            SnippetQueue.status != QueueItemStatus.QUEUED,
+        )
+        num_in_progress = Session.query(SnippetQueue).filter(filter).count()
+        if num_in_progress >= MAX_CONCURRENT_JOBS:
+            return None
+
         return (
             Session.query(SnippetQueue)
             .filter_by(status=QueueItemStatus.QUEUED)
@@ -364,13 +374,13 @@ class SnippetQueue(db.Model, BaseModel):
         all_queued = (
             Session.query(SnippetQueue)
             .filter(filter)
-            .order_by(SnippetQueue.updated_at.desc())
+            .order_by(SnippetQueue.created_at.asc())
             .all()
         )
         queued_and_recently_done = []
         for item in all_queued:
             if item.status == QueueItemStatus.DONE:
-                if item.updated_at > datetime.utcnow() - timedelta(seconds=5):
+                if item.updated_at > datetime.utcnow() - timedelta(seconds=60):
                     queued_and_recently_done.append(item)
             else:
                 queued_and_recently_done.append(item)

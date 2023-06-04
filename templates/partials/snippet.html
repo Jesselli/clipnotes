@@ -2,8 +2,7 @@
     <figure>
         <blockquote class="blockquote pb-4">
             <div class="row">
-                <div class="col-auto"><i class="fa-sharp fa-solid fa-quote-left"
-                        style="color: gray"></i></div>
+                <div class="col-auto"><i class="fa-sharp fa-solid fa-quote-left" style="color: gray"></i></div>
                 <div class="col">
                     <div contenteditable="true" hx-trigger="blur" hx-put="/snippet/{{snippet.id}}"
                         hx-vals="javascript:{text:htmx.find('#snippetText{{snippet.id}}').innerText}"
@@ -21,8 +20,9 @@
             <a href="{{source.url}}?t={{snippet.time}}" class="text-decoration-none text-dark">
                 ({{snippet.time - snippet.duration//2}}s to {{snippet.time + snippet.duration//2}}s)
             </a>
-            <i class="fa-solid fa-circle-minus redhover ps-5" hx-delete="/snippet/{{snippet.id}}" hx-swap="innerHTML swap:1s"
-                hx-trigger="click" hx-target="#snippet{{snippet.id}}" hx-confirm="Are you sure?"></i>
+            <i class="fa-solid fa-circle-minus redhover ps-5" hx-delete="/snippet/{{snippet.id}}"
+                hx-swap="innerHTML swap:1s" hx-trigger="click" hx-target="#snippet{{snippet.id}}"
+                hx-confirm="Are you sure?"></i>
         </figcaption>
     </figure>
 </div>

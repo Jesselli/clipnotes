@@ -41,7 +41,8 @@ def logout():
 @login_required
 def index():
     sources = db.Source.get_user_sources_snippets(current_user.id)
-    return render_template("index.html", sources=sources)
+    queue = db.SnippetQueue.get_user_queue(current_user.id)
+    return render_template("index.html", sources=sources, queue=queue)
 
 
 @main.post("/login")

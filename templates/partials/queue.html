@@ -6,8 +6,13 @@
         </div>
         <div class="col-9">
             <div class="progress" role="progressbar">
-                <div id="pb{{loop.index}}" class="progress-bar" style="width: {{queue_item.status.value*20}}%;">
+                {% if queue_item.status.value != 5 %}
+                <div id="pb{{queue_item.id}}" class="progress-bar" style="width: {{queue_item.status.value*20}}%;">
                     {{queue_item.status.name}}</div>
+                {% else %}
+                <div id="pb{{queue_item.id}}" class="progress-bar bg-success" style="width: 100%;">
+                    {{queue_item.status.name}}</div>
+                {% endif %}
             </div>
         </div>
     </div>
