@@ -3,7 +3,7 @@
 <div class="card mb-5" data-testid="div_addclip">
     <h5 class="card-header">Add a clip</h5>
     <div class="card-body">
-        <form hx-post="/enqueue" hx-target="#sources">
+        <form hx-post="/enqueue" hx-target="#queue">
             <div class="row align-items-end">
                 <div class="col-8">
                     <label for="sourceUrl">Source</label>
@@ -18,6 +18,9 @@
                 </div>
             </div>
         </form>
+        <div id="queue">
+            {{ render_partial("partials/queue.html", queue=queue) }}
+        </div>
     </div>
 </div>
 {{ render_partial("partials/sources.html", sources=sources, queue=queue) }}

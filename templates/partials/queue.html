@@ -1,20 +1,14 @@
-<div class="pb-5" hx-get="/queue" hx-trigger="load delay:1000ms" hx-target="this" hx-swap="outerHTML">
+{% if queue|length > 0 %}
+<div class="pt-3">
     {% for queue_item in queue %}
-    <div class="row">
+    <div class="row align-items-center">
         <div class="col-3 text-truncate">
-            {{ queue_item.url }}
+            {{loop.index}}. {{ queue_item.url }}
         </div>
         <div class="col-9">
-            <div class="progress" role="progressbar">
-                {% if queue_item.status.value != 5 %}
-                <div id="pb{{queue_item.id}}" class="progress-bar" style="width: {{queue_item.status.value*20}}%;">
-                    {{queue_item.status.name}}</div>
-                {% else %}
-                <div id="pb{{queue_item.id}}" class="progress-bar bg-success" style="width: 100%;">
-                    {{queue_item.status.name}}</div>
-                {% endif %}
-            </div>
+            {{render_partial("partials/queue_item.html", queue_item=queue_item)}}
         </div>
     </div>
     {% endfor %}
 </div>
+{% endif %}

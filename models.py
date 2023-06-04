@@ -1,5 +1,7 @@
 import logging
+import inspect
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 from enum import Enum, unique
 from datetime import datetime, timedelta
@@ -44,6 +46,12 @@ class BaseModel:
     @classmethod
     def find_by_id(cls, id):
         return Session.query(cls).get(id)
+
+    def __getattribute__(self, __name: str) -> Any:
+        returned = object.__getattribute__(self, __name)
+        if inspect.isfunction(returned) or inspect.ismethod(returned):
+            logging.debug(f"Calling {__name} on {self}")
+        return returned
 
 
 @dataclass
@@ -213,9 +221,6 @@ class User(db.Model, UserMixin, BaseModel):
     password = db.Column(db.String(255))
     snippets = db.relationship("Snippet", backref="user")
     devices = db.relationship("Device", backref="user")
-
-    def __repr__(self):
-        return f"<User {self.id} - {self.name}>"
 
     @classmethod
     def get_all(cls):

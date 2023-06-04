@@ -42,7 +42,11 @@ def logout():
 def index():
     sources = db.Source.get_user_sources_snippets(current_user.id)
     queue = db.SnippetQueue.get_user_queue(current_user.id)
-    return render_template("index.html", sources=sources, queue=queue)
+    return render_template(
+        "index.html",
+        sources=sources,
+        queue=queue,
+    )
 
 
 @main.post("/login")
@@ -215,16 +219,14 @@ def enqueue():
     time = request.form.get("time", 0)
     user_id = current_user.id
     db.SnippetQueue.add(user_id, url, time, duration)
-    sources = db.Source.get_user_sources_snippets(user_id)
     queue = db.SnippetQueue.get_user_queue(user_id)
-    return render_template("partials/sources.html", sources=sources, queue=queue)
-
-
-@main.get("/queue")
-def get_queue():
-    user_id = current_user.id
-    queue = db.SnippetQueue.get_user_recently_updated(user_id)
     return render_template("partials/queue.html", queue=queue)
+
+
+@main.get("/queue/<queue_id>")
+def get_queue_item(queue_id):
+    queue_item = db.SnippetQueue.find_by_id(queue_id)
+    return render_template("partials/queue_item.html", queue_item=queue_item)
 
 
 # API BLUEPRINT

@@ -13,10 +13,6 @@
     </div>
     {% endif %}
 
-    {% if queue|length > 0 %}
-    {{ render_partial("partials/queue.html", queue=queue) }}
-    {% endif %}
-
     {% for source in sources %}
     <div class="source" id="source{{source.id}}">
         <div class="row">

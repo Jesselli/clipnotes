@@ -66,7 +66,9 @@ def create_app():
 
     config_app()
     db_uri = app.config.get("SQLALCHEMY_DATABASE_URI")
-    engine = create_engine(f"{db_uri}?check_same_thread=False")
+    engine = create_engine(
+        f"{db_uri}?check_same_thread=False",
+    )
     Session.configure(bind=engine)
     app.register_blueprint(main)
     app.register_blueprint(api)

@@ -142,6 +142,7 @@ def save_sync_titles_to_db(user_id, titles):
 
 def timer_job():
     while True:
-        time.sleep(60)
+        # TODO Make this configurable
+        time.sleep(60 * 60)
         logging.info("Readwise timer job triggered")
         add_new_highlights_to_queue()
