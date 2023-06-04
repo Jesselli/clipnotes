@@ -23,6 +23,9 @@ external_sync_thread = Thread(target=readwise.timer_job)
 external_sync_thread.daemon = True
 external_sync_thread.start()
 
+login_manager = LoginManager()
+login_manager.login_view = "main.login"
+
 # TODO Configurable logging level
 log_format = "%(asctime)s %(levelname)s - %(message)s"
 logging.basicConfig(
@@ -53,14 +56,13 @@ def drop_db():
     db.drop_all()
 
 
-def create_app():
-    login_manager = LoginManager()
-    login_manager.login_view = "main.login"
-    login_manager.init_app(app)
+@login_manager.user_loader
+def load_user(user):
+    return User.get_by_id(int(user))
 
-    @login_manager.user_loader
-    def load_user(user):
-        return User.get_by_id(int(user))
+
+def create_app():
+    login_manager.init_app(app)
 
     config_app()
     db_uri = app.config.get("SQLALCHEMY_DATABASE_URI")

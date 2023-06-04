@@ -9,7 +9,7 @@ import requests
 import speech_recognition as sr
 from bs4 import BeautifulSoup
 
-from models import Snippet, Source, SnippetQueue
+from models import Snippet, Source, SnippetQueue, QueueItemStatus
 from services import files
 from config import Config
 
@@ -62,7 +62,7 @@ def transcribe(queue_item: SnippetQueue, audio_filepath: str):
 
 
 def process_snippet_task(queue_item: SnippetQueue):
-    queue_item.update_status("processing")
+    queue_item.update_status(QueueItemStatus.PROCESSING)
 
     existing_snippet = Source.find_snippet(
         queue_item.url,
@@ -71,23 +71,24 @@ def process_snippet_task(queue_item: SnippetQueue):
     )
     if existing_snippet:
         logging.debug("Snippet already exists")
-        queue_item.update_status("done")
+        queue_item.update_status(QueueItemStatus.DONE)
         # TODO: Need to check if THIS user has the snippet.
 
+    # TODO Handle illegal queued urls
     parsed_url = urlparse(queue_item.url)
     if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
-        queue_item.update_status("downloading")
+        queue_item.update_status(QueueItemStatus.DOWNLOADING)
         yt_info = download_youtube_data(queue_item)
         audio_filepath = yt_info["audio_filepath"]
         source = add_source("youtube", **yt_info)
     elif parsed_url.hostname in ["pca.st"]:
-        queue_item.update_status("downloading")
+        queue_item.update_status(QueueItemStatus.DOWNLOADING)
         pc_info = download_pocketcast_data(queue_item)
         audio_filepath = pc_info["audio_filepath"]
         source = add_source("pocketcast", **pc_info)
 
     if source and audio_filepath:
-        queue_item.update_status("transcribing")
+        queue_item.update_status(QueueItemStatus.TRANSCRIBING)
         text = transcribe(queue_item, audio_filepath)
 
         # TODO Do we need Snippet and SnippetQueue?
@@ -99,7 +100,7 @@ def process_snippet_task(queue_item: SnippetQueue):
             text=text,
         )
         snippet.add_to_db()
-        queue_item.update_status("done")
+        queue_item.update_status(QueueItemStatus.DONE)
 
     files.cleanup_tmp_files()
 
@@ -133,8 +134,6 @@ def download_youtube_data(queue_item: SnippetQueue) -> Optional[dict]:
 
 
 def download_pocketcast_data(queue_item: SnippetQueue):
-    queue_item.update_status("downloading")
-
     info_dict = {}
     url = queue_item.url
     info_dict["url"] = url

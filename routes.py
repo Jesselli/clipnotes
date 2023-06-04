@@ -13,7 +13,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import models as db
-from services import readwise, source_processors
+from services import readwise
 from services.markdown import generate_source_markdown
 
 main = Blueprint("main", __name__)
@@ -147,26 +147,6 @@ def delete_source(source_id):
     return ""
 
 
-# TODO This should work differently. Everything should be enqueued.
-@main.post("/snippets")
-def create_snippet():
-    sources = []
-    url = request.form.get("url")
-    duration = request.form.get("duration", 60, type=int)
-    time = request.form.get("time", 0)
-    if current_user and current_user.is_authenticated:
-        source_processors.process_snippet_task(
-            url,
-            current_user.id,
-            time,
-            duration,
-        )
-        sources = db.Source.get_user_sources_snippets(current_user.id)
-        return render_template("partials/sources.html", sources=sources)
-    else:
-        return "Not authenticated"
-
-
 @main.put("/snippet/<int:snippet_id>")
 def update_snippet(snippet_id):
     text = request.form.get("text")
@@ -225,6 +205,25 @@ def delete_device(device_id):
     device = db.Device.find_by_id(device_id)
     device.delete_from_db()
     return ""
+
+
+@main.post("/enqueue")
+def enqueue():
+    url = request.form.get("url")
+    duration = request.form.get("duration", 60, type=int)
+    time = request.form.get("time", 0)
+    user_id = current_user.id
+    db.SnippetQueue.add(user_id, url, time, duration)
+    sources = db.Source.get_user_sources_snippets(user_id)
+    queue = db.SnippetQueue.get_user_queue(user_id)
+    return render_template("partials/sources.html", sources=sources, queue=queue)
+
+
+@main.get("/queue")
+def get_queue():
+    user_id = current_user.id
+    queue = db.SnippetQueue.get_user_recently_updated(user_id)
+    return render_template("partials/queue.html", queue=queue)
 
 
 # API BLUEPRINT

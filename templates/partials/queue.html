@@ -1,0 +1,15 @@
+<div class="pb-5" hx-get="/queue" hx-trigger="load delay:1000ms" hx-target="this" hx-swap="outerHTML">
+    {% for queue_item in queue %}
+    <div class="row">
+        <div class="col-3 text-truncate">
+            {{ queue_item.url }}
+        </div>
+        <div class="col-9">
+            <div class="progress" role="progressbar">
+                <div id="pb{{loop.index}}" class="progress-bar" style="width: {{queue_item.status.value*20}}%;">
+                    {{queue_item.status.name}}</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>

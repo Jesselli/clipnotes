@@ -4,7 +4,7 @@
         <div class="col-12">
             <div class="alert alert-info" role="alert">
                 <div class="alert-heading">
-                    <h2>Welcome!</h2>
+                    <h2>Hey!</h2>
                     You don't have any clips yet. You can add a new clip using the fields above!
                     Simply paste a time-coded YouTube or Pocketcast URL as your source and click the Add button.
                 </div>
@@ -12,6 +12,9 @@
         </div>
     </div>
     {% endif %}
+
+    {{ render_partial("partials/queue.html", queue=queue) }}
+
     {% for source in sources %}
     <div class="source" id="source{{source.id}}">
         <div class="row">

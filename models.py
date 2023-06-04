@@ -1,6 +1,8 @@
 import logging
 from dataclasses import dataclass
 from urllib.parse import urlparse
+from enum import Enum, unique
+from datetime import datetime, timedelta
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -17,6 +19,15 @@ Session = scoped_session(sessionmaker())
 def url_without_query(url):
     parsed_url = urlparse(url)
     return f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+
+
+@unique
+class QueueItemStatus(Enum):
+    QUEUED = 1
+    PROCESSING = 2
+    DOWNLOADING = 3
+    TRANSCRIBING = 4
+    DONE = 5
 
 
 class BaseModel:
@@ -304,14 +315,15 @@ class SnippetQueue(db.Model, BaseModel):
     url = db.Column(db.String(255), nullable=False)
     time = db.Column(db.Integer, nullable=False, default=0)
     duration = db.Column(db.Integer, nullable=False, default=60)
-    status = db.Column(db.String(255), default="queued")
+    status = db.Column(db.Enum(QueueItemStatus), default=QueueItemStatus.QUEUED)
     created_at = db.Column(db.DateTime, default=db.func.now())
+    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 
     @staticmethod
     def add(user_id, url, time, duration):
         logging.debug(f"Adding snippet to queue: {url}")
 
-        if (time is None) and (url_time := time_str.get_time_from_url(url)):
+        if (not time) and (url_time := time_str.get_time_from_url(url)):
             time = url_time
 
         snippet = SnippetQueue(
@@ -326,11 +338,44 @@ class SnippetQueue(db.Model, BaseModel):
     def get_next_item():
         return (
             Session.query(SnippetQueue)
-            .filter_by(status="queued")
+            .filter_by(status=QueueItemStatus.QUEUED)
             .order_by(SnippetQueue.created_at)
             .first()
         )
 
-    def update_status(self, status):
+    @staticmethod
+    def get_user_queue(user_id):
+        filter = and_(
+            SnippetQueue.user_id == user_id,
+            SnippetQueue.status != QueueItemStatus.DONE,
+        )
+        return (
+            Session.query(SnippetQueue)
+            .filter(filter)
+            .order_by(SnippetQueue.created_at)
+            .all()
+        )
+
+    @staticmethod
+    def get_user_recently_updated(user_id):
+        filter = and_(
+            SnippetQueue.user_id == user_id,
+        )
+        all_queued = (
+            Session.query(SnippetQueue)
+            .filter(filter)
+            .order_by(SnippetQueue.updated_at.desc())
+            .all()
+        )
+        queued_and_recently_done = []
+        for item in all_queued:
+            if item.status == QueueItemStatus.DONE:
+                if item.updated_at > datetime.utcnow() - timedelta(seconds=5):
+                    queued_and_recently_done.append(item)
+            else:
+                queued_and_recently_done.append(item)
+        return queued_and_recently_done
+
+    def update_status(self, status: QueueItemStatus):
         self.status = status
         Session.commit()
