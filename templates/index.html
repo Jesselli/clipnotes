@@ -5,20 +5,20 @@
     <div class="card-body">
         <form hx-post="/enqueue" hx-target="#queue">
             <div class="row align-items-end">
-                <div class="col-8">
+                <div class="col-md">
                     <label for="sourceUrl">Source</label>
                     <input name="url" id="sourceUrl" type="text" class="form-control" placeholder="url">
                 </div>
-                <div class="col-2">
+                <div class="col-lg-2">
                     <label for="sourceDuration">Duration</label>
                     <input name="duration" id="sourceDuration" type="text" class="form-control" value="60">
                 </div>
-                <div class="col-2">
+                <div class="col-auto">
                     <button class="btn btn-outline-success" type="submit">Add</button>
                 </div>
             </div>
         </form>
-        <div id="queue">
+        <div id="queue" class="border rounded my-2 p-3">
             {{ render_partial("partials/queue.html", queue=queue) }}
         </div>
     </div>

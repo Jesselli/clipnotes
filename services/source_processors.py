@@ -73,6 +73,7 @@ def process_snippet_task(queue_item: SnippetQueue):
         logging.debug("Snippet already exists")
         queue_item.update_status(QueueItemStatus.DONE)
         # TODO: Need to check if THIS user has the snippet.
+        # TODO: Also check if already queued
 
     # TODO Handle illegal queued urls
     parsed_url = urlparse(queue_item.url)
