@@ -1,0 +1,22 @@
+{% if queue|length > 0 %}
+<div class="border rounded my-2 p-3">
+    {% for queue_item in queue %}
+    <div class="row align-items-center">
+        <div class="col-3 text-truncate">
+            {{loop.index}}. {{ queue_item.url }}
+        </div>
+        <div class="col-9">
+            {{render_partial("partials/queue_item.html", queue_item=queue_item)}}
+        </div>
+    </div>
+    {% endfor %}
+    <div class="row pt-3 justify-content-center">
+        <div class="col-auto">
+            <button onclick="window.location.reload();" class="py-1 btn btn-outline-success">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}

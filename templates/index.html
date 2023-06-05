@@ -3,26 +3,27 @@
 <div class="card mb-5" data-testid="div_addclip">
     <h5 class="card-header">Add a clip</h5>
     <div class="card-body">
-        <form hx-post="/snippets" hx-target="#sources" hx-indicator=".htmx-indicator">
+        <form hx-post="/enqueue" hx-target="#queue">
             <div class="row align-items-end">
-                <div class="col-8">
+                <div class="col-md">
                     <label for="sourceUrl">Source</label>
                     <input name="url" id="sourceUrl" type="text" class="form-control" placeholder="url">
                 </div>
-                <div class="col-2">
+                <div class="col-lg-2">
                     <label for="sourceDuration">Duration</label>
                     <input name="duration" id="sourceDuration" type="text" class="form-control" value="60">
                 </div>
-                <div class="col-2">
+                <div class="col-auto">
                     <button class="btn btn-outline-success" type="submit">Add</button>
-                    <i class="fa-solid fa-gear fa-spin fa-xl me-3 htmx-indicator" style="position:relative; top:1px; left:10px"></i>
-                    <span class="htmx-indicator">Processing!</span>
                 </div>
             </div>
         </form>
+        <div id="queue">
+            {{ render_partial("partials/queue.html", queue=queue) }}
+        </div>
     </div>
 </div>
-{{ render_partial("partials/sources.html", sources=sources) }}
+{{ render_partial("partials/sources.html", sources=sources, queue=queue) }}
 {% endblock %}
 
 {% block additional_css %}

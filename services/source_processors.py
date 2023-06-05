@@ -1,30 +1,19 @@
-import re
 import uuid
 import time
 import logging
 from typing import Optional
-from queue import Queue
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 import yt_dlp
 import requests
 import speech_recognition as sr
 from bs4 import BeautifulSoup
 
-from models import Snippet, Source, Session
+from models import Snippet, Source, SnippetQueue, QueueItemStatus
 from services import files
 from config import Config
 
 r = sr.Recognizer()
-queue = Queue()
-
-
-class SnippetTask:
-    def __init__(self, url, user_id, time_seconds, duration_seconds):
-        self.url = url
-        self.time = time_seconds
-        self.duration = duration_seconds
-        self.user_id = user_id
 
 
 def is_source_supported(source_url):
@@ -37,37 +26,6 @@ def is_source_supported(source_url):
         return False
 
 
-def get_time_from_url(url: str) -> int:
-    parsed_url = urlparse(url)
-    params = parse_qs(parsed_url.query)
-    if "t" in params:
-        time = params["t"][0]
-        return int(time)
-
-    fragment = parsed_url.fragment
-    regex = r"t=(\d+[sm]?\d+[s]?)"
-    time = re.search(regex, fragment)
-    if time:
-        time = time.group(1)
-        return int(time)
-
-    return 0
-
-
-def get_seconds_from_time_str(time):
-    """
-    time: str
-        format: 1m30s or 90s or 90
-    """
-    if "m" in time:
-        minutes, seconds = time.split("m")
-    else:
-        minutes = 0
-        seconds = time
-    seconds = seconds.replace("s", "")
-    return int(minutes) * 60 + int(seconds)
-
-
 # TODO: Consider switching to just using whisper instead of speech_recognition
 def whisper_recognize(clip):
     with sr.AudioFile(clip) as source:
@@ -76,68 +34,81 @@ def whisper_recognize(clip):
     return text_whisper
 
 
-def get_url_without_query_params(url):
-    parsed_url = urlparse(url)
-    url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
-    return url
-
-
-def add_source(url, title=None, thumbnail=None, provider=None):
-    url = get_url_without_query_params(url)
-    existing_source = Session.query(Source).filter_by(url=url).first()
-    if existing_source:
-        source = existing_source
+def add_source(provider: str, **info: dict):
+    if existing_source := Source.find_by_url(info["url"]):
+        return existing_source
     else:
-        source = Source(url=url, title=title, thumb_url=thumbnail, provider=provider)
+        source = Source(
+            url=info["url"],
+            title=info["title"],
+            thumb_url=info["thumbnail"],
+            provider=provider,
+        )
         source.add_to_db()
-    return source
+        return source
 
 
-def add_snippet(audio_filepath, time, duration, source, user_id):
-    clip_wav = files.create_wav_clip(audio_filepath, time, duration)
-    text = whisper_recognize(clip_wav)
-    snippet = Snippet(
-        source_id=source.id, user_id=user_id, time=time, duration=duration, text=text
+def transcribe(queue_item: SnippetQueue, audio_filepath: str):
+    time = queue_item.time
+    duration = queue_item.duration
+
+    clip_wav = files.create_wav_clip(
+        audio_filepath,
+        time,
+        duration,
     )
-    snippet.add_to_db()
-
+    text = whisper_recognize(clip_wav)
     return text
 
 
-def process_snippet_task(task: SnippetTask):
-    url = task.url
-    user_id = task.user_id
-    time = task.time
-    duration = task.duration
+def process_snippet_task(queue_item: SnippetQueue):
+    queue_item.update_status(QueueItemStatus.PROCESSING)
 
-    parsed_url = urlparse(url)
+    existing_snippet = Source.find_snippet(
+        queue_item.url,
+        queue_item.time,
+        queue_item.duration,
+    )
+    if existing_snippet:
+        logging.debug("Snippet already exists")
+        queue_item.update_status(QueueItemStatus.DONE)
+        # TODO: Need to check if THIS user has the snippet.
+        # TODO: Also check if already queued
 
-    if not time:
-        if url_time := get_time_from_url(url):
-            time = url_time
-        else:
-            logging.warning("No time specified or found in url.")
-            time = 0
-
-    base_url = get_url_without_query_params(url)
-    if Source.find_snippet(base_url, time, duration):
-        logging.info("Snippet already exists. Skipping processing.")
-        return
-
-    logging.debug(f"Processing url {base_url} at time {time} for duration {duration}")
+    # TODO Handle illegal queued urls
+    parsed_url = urlparse(queue_item.url)
     if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
-        yt_info = get_youtube_info(url)
+        queue_item.update_status(QueueItemStatus.DOWNLOADING)
+        yt_info = download_youtube_data(queue_item)
         audio_filepath = yt_info["audio_filepath"]
-        source = create_youtube_source(yt_info)
+        source = add_source("youtube", **yt_info)
     elif parsed_url.hostname in ["pca.st"]:
-        source, audio_filepath = process_pocketcast_link(url)
+        queue_item.update_status(QueueItemStatus.DOWNLOADING)
+        pc_info = download_pocketcast_data(queue_item)
+        audio_filepath = pc_info["audio_filepath"]
+        source = add_source("pocketcast", **pc_info)
 
     if source and audio_filepath:
-        add_snippet(audio_filepath, time, duration, source, user_id)
+        queue_item.update_status(QueueItemStatus.TRANSCRIBING)
+        text = transcribe(queue_item, audio_filepath)
+
+        # TODO Do we need Snippet and SnippetQueue?
+        snippet = Snippet(
+            source_id=source.id,
+            user_id=queue_item.user_id,
+            time=queue_item.time,
+            duration=queue_item.duration,
+            text=text,
+        )
+        snippet.add_to_db()
+        queue_item.update_status(QueueItemStatus.DONE)
+
     files.cleanup_tmp_files()
 
 
-def get_youtube_info(url: str) -> Optional[dict]:
+def download_youtube_data(queue_item: SnippetQueue) -> Optional[dict]:
+    # TODO Create table for queue item status? Or an enum?
+
     filename = uuid.uuid4()
     ydl_opts = {
         "format": "mp3/bestaudio/best",
@@ -151,62 +122,47 @@ def get_youtube_info(url: str) -> Optional[dict]:
         "writeinfojson": True,
     }
 
+    url = queue_item.url
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info_dict = ydl.extract_info(url, download=False)
         ydl.download([url])
 
     # TODO Might not always be mp3.
     info_dict["audio_filepath"] = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
+    # TODO We should always use the base url and time/duration
+    info_dict["url"] = url
     return info_dict
 
 
-def create_youtube_source(yt_info: dict) -> Source:
-    if not yt_info:
-        logging.warning("No youtube info given for creating source.")
-        return None
+def download_pocketcast_data(queue_item: SnippetQueue):
+    info_dict = {}
+    url = queue_item.url
+    info_dict["url"] = url
 
-    title = yt_info.get("title", "")
-    # TODO: Use subtitles if avaialble, instead of audio
-    # TODO: Include option to use automatic_captions
-    # TODO: Include tags if available
-    # TODO: Include source name (Veritasium, Daily Stoic, etc.)
-    thumbnail = yt_info.get("thumbnail", "")
-    url = yt_info.get("original_url")
-    source = add_source(url, title=title, thumbnail=thumbnail, provider="youtube")
-    return source
-
-
-def process_pocketcast_link(url):
     r = requests.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
     download_button = soup.find("a", {"class": "download-button"})
     if not download_button:
         logging.error("No download button found.")
-        # TODO This is a bad thing to return
-        return None, None
+        return None
 
     download_link = download_button["href"]
     audio_filepath = files.download_file(download_link)
+    info_dict["audio_filepath"] = audio_filepath
 
     title = soup.find("meta", {"property": "og:title"})["content"]
-    thumb_url = soup.find("meta", {"property": "og:image"})["content"]
+    info_dict["title"] = title
 
-    source = add_source(url, title, thumb_url, "pocketcast")
-    return source, audio_filepath
+    thumb_url = soup.find("meta", {"property": "og:image"})["content"]
+    info_dict["thumbnail"] = thumb_url
+
+    return info_dict
 
 
 def process_queue():
     while True:
-        time.sleep(1)
-        if task := queue.get():
-            logging.info("Starting queue job.")
-            process_snippet_task(task)
-            queue.task_done()
-            logging.info("Queue job complete.")
-
-
-def add_to_queue(tasks):
-    # TODO MOVE THE QUEUE TO THE DB 
-    for task in tasks:
-        logging.info(f"Adding {task.url} to queue")
-        queue.put(task)
+        time.sleep(10)
+        if queue_item := SnippetQueue.get_next_item():
+            logging.info(f"Starting queue job {queue_item.id}")
+            process_snippet_task(queue_item)
+            logging.info(f"Queue job {queue_item.id} complete.")
