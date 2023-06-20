@@ -65,14 +65,16 @@ def process_snippet_task(queue_item: SnippetQueue):
     queue_item.update_status(QueueItemStatus.PROCESSING)
 
     existing_snippet = Source.find_snippet(
+        queue_item.user_id,
         queue_item.url,
         queue_item.time,
         queue_item.duration,
     )
+
     if existing_snippet:
         logging.debug("Snippet already exists")
         queue_item.update_status(QueueItemStatus.DONE)
-        # TODO: Need to check if THIS user has the snippet.
+        return
         # TODO: Also check if already queued
 
     # TODO Handle illegal queued urls

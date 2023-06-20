@@ -124,10 +124,11 @@ class Source(db.Model, BaseModel):
             source.snippets.sort(key=lambda x: x.time, reverse=False)
         return sources
 
-    @classmethod
-    def find_snippet(cls, url, time, duration):
+    @staticmethod
+    def find_snippet(user_id, url, time, duration):
         url = url_without_query(url)
         filter = and_(
+            Snippet.user_id == user_id,
             Snippet.source_id == Source.id,
             Snippet.time == time,
             Snippet.duration == duration,

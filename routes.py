@@ -65,7 +65,6 @@ def login_post():
     return render_template("partials/login_form.html")
 
 
-# TODO Cleanup the UserSettings code in routes.py
 @main.get("/settings")
 @login_required
 def get_settings():
@@ -194,8 +193,7 @@ def add_device():
         last_four=f"{'*'*20}{device_key[-4:]}",
     )
     new_device.add_to_db()
-    # TODO Move this into a tiny partial template?
-    return f'<input style="font-weight:bold;" class="form-control border-danger" value="{device_key}">'
+    return render_template('partials/device_input.html', device_key=device_key) 
 
 
 @main.get("/devices/table")
