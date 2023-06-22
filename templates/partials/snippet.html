@@ -17,8 +17,8 @@
         </blockquote>
         <figcaption class="blockquote-footer text-end">
             {{snippet.created_at}}
-            <a href="{{source.url}}?t={{snippet.time}}" class="text-decoration-none text-dark">
-                ({{snippet.time - snippet.duration//2}}s to {{snippet.time + snippet.duration//2}}s)
+            <a href="{{source.url}}?t={{snippet.start_time}}" class="text-decoration-none text-dark">
+                ({{snippet.start_time}}s to {{snippet.end_time}}s)
             </a>
             <i class="fa-solid fa-circle-minus redhover ps-5" hx-delete="/snippet/{{snippet.id}}"
                 hx-swap="innerHTML swap:1s" hx-trigger="click" hx-target="#snippet{{snippet.id}}"

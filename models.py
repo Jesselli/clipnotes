@@ -12,8 +12,6 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import and_
 from werkzeug.security import check_password_hash
 
-from services import time_str
-
 db = SQLAlchemy()
 Session = scoped_session(sessionmaker())
 
@@ -59,16 +57,16 @@ class Snippet(db.Model, BaseModel):
     id: int
     user_id: int
     source_id: int
-    time: int
-    duration: int
+    start_time: int
+    end_time: int
     created_at: str
     text: str
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     source_id = db.Column(db.Integer, db.ForeignKey("source.id"), nullable=False)
-    time = db.Column(db.Integer, nullable=False, default=0)
-    duration = db.Column(db.Integer, nullable=False, default=60)
+    start_time = db.Column(db.Integer, nullable=False)
+    end_time = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.now())
     text = db.Column(db.Text, nullable=False)
 
@@ -121,17 +119,17 @@ class Source(db.Model, BaseModel):
             .all()
         )
         for source in sources:
-            source.snippets.sort(key=lambda x: x.time, reverse=False)
+            source.snippets.sort(key=lambda x: x.start_time, reverse=False)
         return sources
 
     @staticmethod
-    def find_snippet(user_id, url, time, duration):
+    def find_snippet(user_id, url, start_time, end_time):
         url = url_without_query(url)
         filter = and_(
             Snippet.user_id == user_id,
             Snippet.source_id == Source.id,
-            Snippet.time == time,
-            Snippet.duration == duration,
+            Snippet.start_time == start_time,
+            Snippet.end_time == end_time,
         )
         return Session.query(Source).filter_by(url=url).filter(filter).first()
 
@@ -319,24 +317,25 @@ class SnippetQueue(db.Model, BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     url = db.Column(db.String(255), nullable=False)
-    time = db.Column(db.Integer, nullable=False, default=0)
-    duration = db.Column(db.Integer, nullable=False, default=60)
+    start_time = db.Column(db.Integer, nullable=False)
+    end_time = db.Column(db.Integer, nullable=False)
     status = db.Column(db.Enum(QueueItemStatus), default=QueueItemStatus.QUEUED)
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 
     @staticmethod
-    def add(user_id, url, time, duration):
+    def add(user_id, url, start_time, end_time):
         logging.debug(f"Adding snippet to queue: {url}")
 
-        if (not time) and (url_time := time_str.get_time_from_url(url)):
-            time = url_time
+        # TODO We shouldn't get to this point without a start_time and end_time
+        # if (not time) and (url_time := time_str.get_time_from_url(url)):
+        #     time = url_time
 
         snippet = SnippetQueue(
             user_id=user_id,
             url=url,
-            time=time,
-            duration=duration,
+            start_time=start_time,
+            end_time=end_time,
         )
         snippet.add_to_db()
 

@@ -49,14 +49,10 @@ def add_source(provider: str, **info: dict):
 
 
 def transcribe(queue_item: SnippetQueue, audio_filepath: str):
-    time = queue_item.time
-    duration = queue_item.duration
+    start_time = queue_item.start_time
+    end_time = queue_item.end_time
 
-    clip_wav = files.create_wav_clip(
-        audio_filepath,
-        time,
-        duration,
-    )
+    clip_wav = files.create_wav_clip(audio_filepath, start_time, end_time)
     text = whisper_recognize(clip_wav)
     return text
 
@@ -65,10 +61,7 @@ def process_snippet_task(queue_item: SnippetQueue):
     queue_item.update_status(QueueItemStatus.PROCESSING)
 
     existing_snippet = Source.find_snippet(
-        queue_item.user_id,
-        queue_item.url,
-        queue_item.time,
-        queue_item.duration,
+        queue_item.user_id, queue_item.url, queue_item.start_time, queue_item.end_time
     )
 
     if existing_snippet:
@@ -98,8 +91,8 @@ def process_snippet_task(queue_item: SnippetQueue):
         snippet = Snippet(
             source_id=source.id,
             user_id=queue_item.user_id,
-            time=queue_item.time,
-            duration=queue_item.duration,
+            start_time=queue_item.start_time,
+            end_time=queue_item.end_time,
             text=text,
         )
         snippet.add_to_db()

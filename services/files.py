@@ -23,17 +23,11 @@ def download_file(url, directory=Config.TMP_DIRECTORY, filename=None):
     return filepath
 
 
-def create_wav_clip(filepath, seconds_location, duration):
+def create_wav_clip(filepath, start_time, end_time):
     extension = filepath.split(".")[-1]
     podcast = AudioSegment.from_file(filepath, format=extension)
-    start_ms = (seconds_location - (duration // 2)) * 1000
-    if start_ms < 0:
-        start_ms = 0
-
-    end_ms = (seconds_location + (duration // 2)) * 1000
-    if end_ms > len(podcast):
-        end_ms = len(podcast)
-
+    start_ms = start_time * 1000
+    end_ms = end_time * 1000
     clip = podcast[start_ms:end_ms]
     clip_wav = os.path.splitext(filepath)[0] + ".wav"
     clip.export(clip_wav, format="wav")

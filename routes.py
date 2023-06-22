@@ -14,6 +14,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import models as db
 from services import readwise
+from services.time_str import get_time_from_url, get_url_without_time
 from services.markdown import generate_source_markdown
 
 main = Blueprint("main", __name__)
@@ -65,6 +66,7 @@ def login_post():
     return render_template("partials/login_form.html")
 
 
+# TODO Cleanup the UserSettings code in routes.py
 @main.get("/settings")
 @login_required
 def get_settings():
@@ -193,7 +195,8 @@ def add_device():
         last_four=f"{'*'*20}{device_key[-4:]}",
     )
     new_device.add_to_db()
-    return render_template('partials/device_input.html', device_key=device_key) 
+    # TODO Move this into a tiny partial template?
+    return f'<input style="font-weight:bold;" class="form-control border-danger" value="{device_key}">'
 
 
 @main.get("/devices/table")
@@ -212,11 +215,15 @@ def delete_device(device_id):
 
 @main.post("/enqueue")
 def enqueue():
+    # TODO Consider changing the UI to start/end time fields
     url = request.form.get("url")
+    time = get_time_from_url(url)
+    source_url = get_url_without_time(url)
     duration = request.form.get("duration", 60, type=int)
-    time = request.form.get("time", 0)
+    start_time = time - (duration // 2)
+    end_time = time + (duration // 2)
     user_id = current_user.id
-    db.SnippetQueue.add(user_id, url, time, duration)
+    db.SnippetQueue.add(user_id, source_url, start_time, end_time)
     queue = db.SnippetQueue.get_user_queue(user_id)
     return render_template("partials/queue.html", queue=queue)
 
@@ -266,10 +273,11 @@ def api_get_sources():
 
 @api.post("/enqueue")
 def api_enqueue():
+    # TODO Better parsing of args -- failure states
     api_key = request.headers.get("X-Api-Key")
     url = request.args.get("url")
-    time = request.args.get("time", type=int)
-    duration = request.args.get("duration", type=int)
+    start = request.args.get("start", type=int)
+    end = request.args.get("end", type=int)
     user_id = db.Device.find_by_key(api_key).user_id
-    db.SnippetQueue.add(user_id, url, time, duration)
+    db.SnippetQueue.add(user_id, url, start, end)
     return "Success", 200

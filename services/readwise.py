@@ -89,9 +89,10 @@ def enqueue_new_snippets(user_id: int, titles: list[int]):
 
         h_note = highlight.get("note", "")
         default_duration = get_default_duration_from_db(user_id)
+
         # TODO Stop using notes. I guess this needs to go in the description.
-        time, duration = time_str.parse_time_duration(h_note, default_duration)
-        SnippetQueue.add(user_id, url, time, duration)
+        start, end = time_str.parse_start_end_time(h_note, default_duration)
+        SnippetQueue.add(user_id, url, start, end)
 
 
 def get_utc_sync_datetime(user_id):

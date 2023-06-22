@@ -2,6 +2,11 @@ import re
 from urllib.parse import parse_qs, urlparse
 
 
+def get_url_without_time(url: str) -> str:
+    parsed_url = urlparse(url, allow_fragments=False)
+    return parsed_url._replace(query="").geturl()
+
+
 def get_time_from_url(url: str) -> int:
     parsed_url = urlparse(url)
     params = parse_qs(parsed_url.query)
@@ -30,11 +35,9 @@ def time_to_seconds(note: str) -> int:
     return (minutes * 60) + seconds
 
 
-def parse_time_duration(time_str: str) -> tuple[int, int]:
+def parse_start_end_time(time_str: str) -> tuple[int, int]:
     """
-    Returns the time and duration in seconds
-    time will be the midpoint of the time range
-    duration will be the difference between the start and end of the time range
+    Returns the start and end times in seconds
     time_str expected format: 1:30-2:00
     """
     if not time_str:
@@ -46,6 +49,4 @@ def parse_time_duration(time_str: str) -> tuple[int, int]:
 
     start = time_to_seconds(split_note[0])
     end = time_to_seconds(split_note[1])
-    time = start + ((end - start) // 2)
-    duration = end - start
-    return time, duration
+    return start, end
