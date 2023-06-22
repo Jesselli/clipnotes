@@ -195,8 +195,7 @@ def add_device():
         last_four=f"{'*'*20}{device_key[-4:]}",
     )
     new_device.add_to_db()
-    # TODO Move this into a tiny partial template?
-    return f'<input style="font-weight:bold;" class="form-control border-danger" value="{device_key}">'
+    return render_template("partials/device_input.html", device_key=device_key)
 
 
 @main.get("/devices/table")
@@ -276,8 +275,9 @@ def api_enqueue():
     # TODO Better parsing of args -- failure states
     api_key = request.headers.get("X-Api-Key")
     url = request.args.get("url")
+    source_url = get_url_without_time(url)
     start = request.args.get("start", type=int)
     end = request.args.get("end", type=int)
     user_id = db.Device.find_by_key(api_key).user_id
-    db.SnippetQueue.add(user_id, url, start, end)
+    db.SnippetQueue.add(user_id, source_url, start, end)
     return "Success", 200

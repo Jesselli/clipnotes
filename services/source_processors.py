@@ -68,7 +68,6 @@ def process_snippet_task(queue_item: SnippetQueue):
         logging.debug("Snippet already exists")
         queue_item.update_status(QueueItemStatus.DONE)
         return
-        # TODO: Also check if already queued
 
     # TODO Handle illegal queued urls
     parsed_url = urlparse(queue_item.url)
@@ -124,7 +123,6 @@ def download_youtube_data(queue_item: SnippetQueue) -> Optional[dict]:
 
     # TODO Might not always be mp3.
     info_dict["audio_filepath"] = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
-    # TODO We should always use the base url and time/duration
     info_dict["url"] = url
     return info_dict
 

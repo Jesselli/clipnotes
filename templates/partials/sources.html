@@ -31,8 +31,8 @@
                 </a>
             </div>
         </div>
-        <div class="row">
-            <div class="col-3">
+        <div class="row row-cols-sm-1 row-cols-lg-2">
+            <div class="col-sm-12 col-lg-4 pb-4">
                 <img src={{source.thumb_url}} class="img-fluid shadow">
                 <i hx-trigger="click" hx-delete="/source/{{source.id}}" hx-target="#source{{source.id}}"
                     hx-confirm="Are you sure?" hx-swap="innerHTML swap:1s"

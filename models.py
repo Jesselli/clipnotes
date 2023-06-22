@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 from enum import Enum, unique
-from datetime import datetime, timedelta
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -324,12 +323,19 @@ class SnippetQueue(db.Model, BaseModel):
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 
     @staticmethod
-    def add(user_id, url, start_time, end_time):
-        logging.debug(f"Adding snippet to queue: {url}")
-
-        # TODO We shouldn't get to this point without a start_time and end_time
-        # if (not time) and (url_time := time_str.get_time_from_url(url)):
-        #     time = url_time
+    def add(user_id: int, url: str, start_time: int, end_time: int):
+        existing = (
+            Session.query(SnippetQueue)
+            .filter_by(
+                user_id=user_id,
+                url=url,
+                start_time=start_time,
+                end_time=end_time,
+            )
+            .first()
+        )
+        if existing:
+            return existing
 
         snippet = SnippetQueue(
             user_id=user_id,
@@ -338,6 +344,7 @@ class SnippetQueue(db.Model, BaseModel):
             end_time=end_time,
         )
         snippet.add_to_db()
+        return snippet
 
     @staticmethod
     def get_next_item():
@@ -370,26 +377,6 @@ class SnippetQueue(db.Model, BaseModel):
             .order_by(SnippetQueue.created_at)
             .all()
         )
-
-    @staticmethod
-    def get_user_recently_updated(user_id):
-        filter = and_(
-            SnippetQueue.user_id == user_id,
-        )
-        all_queued = (
-            Session.query(SnippetQueue)
-            .filter(filter)
-            .order_by(SnippetQueue.created_at.asc())
-            .all()
-        )
-        queued_and_recently_done = []
-        for item in all_queued:
-            if item.status == QueueItemStatus.DONE:
-                if item.updated_at > datetime.utcnow() - timedelta(seconds=60):
-                    queued_and_recently_done.append(item)
-            else:
-                queued_and_recently_done.append(item)
-        return queued_and_recently_done
 
     def update_status(self, status: QueueItemStatus):
         self.status = status
