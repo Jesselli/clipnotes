@@ -40,7 +40,7 @@
                 <i class="fa-sharp fa-solid fa-copy fa-xl redhover liveToastBtn"
                     onclick="copyToClipboard({{source.id}})"></i>
             </div>
-            <div class="col-9">
+            <div class="col-sm-12 col-lg-8">
                 {% for snippet in source.snippets %}
                 {{ render_partial("partials/snippet.html", snippet=snippet, source=source) }}
                 {% endfor %}

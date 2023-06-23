@@ -218,9 +218,12 @@ def enqueue():
     url = request.form.get("url")
     time = get_time_from_url(url)
     source_url = get_url_without_time(url)
-    duration = request.form.get("duration", 60, type=int)
-    start_time = time - (duration // 2)
-    end_time = time + (duration // 2)
+    duration = request.form.get("duration", type=int)
+    start_time = request.form.get("start")
+    end_time = request.form.get("end")
+    if duration:
+        start_time = time - (duration // 2)
+        end_time = time + (duration // 2)
     user_id = current_user.id
     db.SnippetQueue.add(user_id, source_url, start_time, end_time)
     queue = db.SnippetQueue.get_user_queue(user_id)
