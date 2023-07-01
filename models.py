@@ -62,6 +62,8 @@ class BaseModel:
 
 @dataclass
 class Snippet(db.Model, BaseModel):
+    start_time: int
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     source_id = db.Column(db.Integer, db.ForeignKey("source.id"), nullable=False)

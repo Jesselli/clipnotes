@@ -17,7 +17,7 @@
         </blockquote>
         <figcaption class="blockquote-footer text-end">
             {{snippet.created_at}}
-            <a href="{{source.url}}?t={{snippet.start_time}}" class="text-decoration-none text-dark">
+            <a href="{{source.url}}?t={{snippet.start_time}}" class="text-decoration-none text-light-emphasis redhover">
                 ({{snippet.start_time}}s to {{snippet.end_time}}s)
             </a>
             <i class="fa-solid fa-circle-minus redhover ps-5" hx-delete="/snippet/{{snippet.id}}"

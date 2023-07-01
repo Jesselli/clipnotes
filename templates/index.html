@@ -4,7 +4,7 @@
     <h5 class="card-header">Add a clip</h5>
     <div class="card-body">
         <form hx-post="/enqueue" hx-target="#queue">
-            <div class="row align-items-end">
+            <div class="row gy-4 align-items-end">
                 <div class="col-sm-8">
                     <label for="sourceUrl">Source</label>
                     <input name="url" id="sourceUrl" type="text" class="form-control" placeholder="url">
@@ -14,7 +14,7 @@
                     <input name="duration" id="sourceDuration" type="text" class="form-control" value="60">
                 </div>
                 <div class="col-sm-2">
-                    <button class="btn btn-outline-success w-100" type="submit">Add</button>
+                    <button class="btn btn-primary w-100" type="submit">Add</button>
                 </div>
             </div>
         </form>

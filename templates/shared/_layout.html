@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 
 <head>
     <meta charset="utf-8" />
@@ -54,7 +54,8 @@
             </a>
             {% if current_user.is_authenticated %}
             <div class="dropdown">
-                <i class="fa-solid fa-user fa-xl dropdown-toggle redhover" data-bs-toggle="dropdown" style="color:white;"></i>
+                <i class="fa-solid fa-user fa-xl dropdown-toggle redhover" data-bs-toggle="dropdown"
+                    style="color:white;"></i>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li>
                         <p class="dropdown-header">{{current_user.email}}</p>
