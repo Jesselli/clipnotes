@@ -42,7 +42,7 @@ def logout():
 @login_required
 def index():
     sources = db.Source.get_user_sources_snippets(current_user.id)
-    queue = db.SnippetQueue.get_user_queue(current_user.id)
+    queue = db.Snippet.get_user_queue(current_user.id)
     return render_template(
         "index.html",
         sources=sources,
@@ -157,7 +157,7 @@ def delete_source(source_id):
 def update_snippet(snippet_id):
     text = request.form.get("text")
     snippet = db.Snippet.find_by_id(snippet_id)
-    snippet.update_text_in_db(text)
+    snippet.update_text(text)
     return text
 
 
@@ -225,14 +225,15 @@ def enqueue():
         start_time = time - (duration // 2)
         end_time = time + (duration // 2)
     user_id = current_user.id
-    db.SnippetQueue.add(user_id, source_url, start_time, end_time)
-    queue = db.SnippetQueue.get_user_queue(user_id)
+    source = db.Source.add(source_url)
+    db.Snippet.add(user_id, source.id, start_time, end_time)
+    queue = db.Snippet.get_user_queue(user_id)
     return render_template("partials/queue.html", queue=queue)
 
 
 @main.get("/queue/<queue_id>")
 def get_queue_item(queue_id):
-    queue_item = db.SnippetQueue.find_by_id(queue_id)
+    queue_item = db.Snippet.find_by_id(queue_id)
     return render_template("partials/queue_item.html", queue_item=queue_item)
 
 
@@ -282,5 +283,6 @@ def api_enqueue():
     start = request.args.get("start", type=int)
     end = request.args.get("end", type=int)
     user_id = db.Device.find_by_key(api_key).user_id
-    db.SnippetQueue.add(user_id, source_url, start, end)
+    source = db.Source.add(source_url)
+    db.Snippet.add(user_id, source.id, start, end)
     return "Success", 200

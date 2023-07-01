@@ -9,7 +9,7 @@ import requests
 import speech_recognition as sr
 from bs4 import BeautifulSoup
 
-from models import Snippet, Source, SnippetQueue, QueueItemStatus
+import models as db
 from services import files
 from config import Config
 
@@ -34,21 +34,7 @@ def whisper_recognize(clip):
     return text_whisper
 
 
-def add_source(provider: str, **info: dict):
-    if existing_source := Source.find_by_url(info["url"]):
-        return existing_source
-    else:
-        source = Source(
-            url=info["url"],
-            title=info["title"],
-            thumb_url=info["thumbnail"],
-            provider=provider,
-        )
-        source.add_to_db()
-        return source
-
-
-def transcribe(queue_item: SnippetQueue, audio_filepath: str):
+def transcribe(queue_item: db.Snippet, audio_filepath: str):
     start_time = queue_item.start_time
     end_time = queue_item.end_time
 
@@ -57,50 +43,35 @@ def transcribe(queue_item: SnippetQueue, audio_filepath: str):
     return text
 
 
-def process_snippet_task(queue_item: SnippetQueue):
-    queue_item.update_status(QueueItemStatus.PROCESSING)
-
-    existing_snippet = Source.find_snippet(
-        queue_item.user_id, queue_item.url, queue_item.start_time, queue_item.end_time
-    )
-
-    if existing_snippet:
-        logging.debug("Snippet already exists")
-        queue_item.update_status(QueueItemStatus.DONE)
-        return
+def process_snippet_task(queue_item: db.Snippet):
+    queue_item.update_status(db.SnippetStatus.PROCESSING)
 
     # TODO Handle illegal queued urls
-    parsed_url = urlparse(queue_item.url)
-    if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
-        queue_item.update_status(QueueItemStatus.DOWNLOADING)
+    source = db.Source.find_by_id(queue_item.source_id)
+    if source.provider == db.SourceProvider.YOUTUBE:
+        queue_item.update_status(db.SnippetStatus.DOWNLOADING)
         yt_info = download_youtube_data(queue_item)
         audio_filepath = yt_info["audio_filepath"]
-        source = add_source("youtube", **yt_info)
-    elif parsed_url.hostname in ["pca.st"]:
-        queue_item.update_status(QueueItemStatus.DOWNLOADING)
+        source.update_title(yt_info["title"])
+        source.update_thumb_url(yt_info["thumbnail"])
+    elif source.provider == db.SourceProvider.POCKETCASTS:
+        queue_item.update_status(db.SnippetStatus.DOWNLOADING)
         pc_info = download_pocketcast_data(queue_item)
         audio_filepath = pc_info["audio_filepath"]
-        source = add_source("pocketcast", **pc_info)
+        source.update_title(pc_info["title"])
+        source.update_thumb_url(pc_info["thumbnail"])
 
     if source and audio_filepath:
-        queue_item.update_status(QueueItemStatus.TRANSCRIBING)
+        queue_item.update_status(db.SnippetStatus.TRANSCRIBING)
         text = transcribe(queue_item, audio_filepath)
 
-        # TODO Do we need Snippet and SnippetQueue?
-        snippet = Snippet(
-            source_id=source.id,
-            user_id=queue_item.user_id,
-            start_time=queue_item.start_time,
-            end_time=queue_item.end_time,
-            text=text,
-        )
-        snippet.add_to_db()
-        queue_item.update_status(QueueItemStatus.DONE)
+        queue_item.update_text(text)
+        queue_item.update_status(db.SnippetStatus.DONE)
 
     files.cleanup_tmp_files()
 
 
-def download_youtube_data(queue_item: SnippetQueue) -> Optional[dict]:
+def download_youtube_data(queue_item: db.Snippet) -> Optional[dict]:
     # TODO Create table for queue item status? Or an enum?
 
     filename = uuid.uuid4()
@@ -116,7 +87,7 @@ def download_youtube_data(queue_item: SnippetQueue) -> Optional[dict]:
         "writeinfojson": True,
     }
 
-    url = queue_item.url
+    url = queue_item.get_source_url()
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info_dict = ydl.extract_info(url, download=False)
         ydl.download([url])
@@ -127,7 +98,7 @@ def download_youtube_data(queue_item: SnippetQueue) -> Optional[dict]:
     return info_dict
 
 
-def download_pocketcast_data(queue_item: SnippetQueue):
+def download_pocketcast_data(queue_item: db.Snippet):
     info_dict = {}
     url = queue_item.url
     info_dict["url"] = url
@@ -155,7 +126,7 @@ def download_pocketcast_data(queue_item: SnippetQueue):
 def process_queue():
     while True:
         time.sleep(10)
-        if queue_item := SnippetQueue.get_next_item():
+        if queue_item := db.Snippet.get_next_in_queue():
             logging.info(f"Starting queue job {queue_item.id}")
             process_snippet_task(queue_item)
             logging.info(f"Queue job {queue_item.id} complete.")

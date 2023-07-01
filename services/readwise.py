@@ -6,7 +6,7 @@ from typing import Optional
 import requests
 from dateutil.parser import parse as dateutil_parse
 
-from models import ExternalSyncRecord, User, UserSettings, SnippetQueue
+from models import ExternalSyncRecord, User, UserSettings  # , SnippetQueue
 
 from . import time_str
 from .source_processors import is_source_supported
@@ -92,7 +92,7 @@ def enqueue_new_snippets(user_id: int, titles: list[int]):
 
         # TODO Stop using notes. I guess this needs to go in the description.
         start, end = time_str.parse_start_end_time(h_note, default_duration)
-        SnippetQueue.add(user_id, url, start, end)
+        # SnippetQueue.add(user_id, url, start, end)
 
 
 def get_utc_sync_datetime(user_id):
