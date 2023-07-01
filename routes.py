@@ -13,7 +13,6 @@ from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import models as db
-from services import readwise
 from services.time_str import get_time_from_url, get_url_without_time
 from services.markdown import generate_source_markdown
 
@@ -78,40 +77,10 @@ def get_settings():
     return render_template("settings.html", settings=settings)
 
 
-@main.get("/readwise/titles")
-def get_readwise_titles():
-    user_id = current_user.id
-    readwise_titles = readwise.get_all_titles(user_id)
-    readwise_sync_titles = readwise.get_sync_titles_from_db(user_id)
-    return render_template(
-        "partials/readwise_titles.html",
-        readwise_titles=readwise_titles,
-        readwise_sync_titles=readwise_sync_titles,
-    )
-
-
 @main.post("/settings")
 def post_settings():
-    user_id = current_user.id
-    if "readwise_titles" in request.form:
-        readwise_titles = request.form.getlist("readwise_titles")
-        readwise.save_sync_titles_to_db(user_id, readwise_titles)
-
-    for setting_name in request.form:
-        if setting_name == "readwise_titles":
-            continue
-
-        existing_setting = db.UserSettings.find(user_id, setting_name)
-        value = request.form.get(setting_name)
-        if existing_setting:
-            existing_setting.update_value(value)
-        else:
-            db.UserSettings.create(user_id, setting_name, value)
-
-    return render_template(
-        "partials/readwise_settings.html",
-        settings=request.form,
-    )
+    # TODO Re-implement settings page
+    return ""
 
 
 @main.post("/register")

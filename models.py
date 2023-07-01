@@ -192,10 +192,14 @@ class Source(db.Model, BaseModel):
 
     @classmethod
     def get_user_sources_snippets(cls, user_id):
+        filter = and_(
+            Snippet.user_id == user_id,
+            Snippet.status == SnippetStatus.DONE,
+        )
         sources = (
             Session.query(Source)
             .join(Snippet)
-            .filter(Snippet.user_id == user_id)
+            .filter(filter)
             .order_by(Snippet.created_at.desc())
             .all()
         )
@@ -261,45 +265,6 @@ class SyncRecord(db.Model, BaseModel):
     def update_sync_time(self, time=db.func.now()):
         self.synced_at = time
         Session.commit()
-
-
-class ExternalSyncRecord(db.Model, BaseModel):
-    id: int
-    user_id: int
-    service: str
-    synced_at: str
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    service = db.Column(db.String(255), nullable=False)
-    synced_at = db.Column(db.DateTime, default=db.func.now())
-
-    def update_sync_time(self, time=db.func.now()):
-        self.synced_at = time
-        Session.commit()
-
-    @classmethod
-    def find_by_user_service(cls, user_id, service):
-        record = (
-            Session.query(ExternalSyncRecord)
-            .filter_by(user_id=user_id, service=service)
-            .first()
-        )
-        return record
-
-    @staticmethod
-    def get_readwise_sync_record(user_id):
-        return ExternalSyncRecord.find_by_user_service(user_id, "readwise")
-
-    @staticmethod
-    def add_readwise_sync_record(user_id):
-        sync_record = ExternalSyncRecord(user_id=user_id, service="readwise")
-        sync_record.add_to_db()
-
-    @staticmethod
-    def update_readwise_sync_record(user_id):
-        sync_record = ExternalSyncRecord.find_by_user_service(user_id, "readwise")
-        sync_record.update_sync_time()
 
 
 @dataclass

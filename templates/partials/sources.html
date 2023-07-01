@@ -15,7 +15,7 @@
 
     {% for source in sources %}
     <div class="source" id="source{{source.id}}">
-        <div class="row pb-2">
+        <div class="row pb-4">
             <a href="{{source.url}}" class="text-decoration-none">
                 {% if source.provider.value == 1 %}
                 <i class="fas fa-brands fa-youtube fa-2x pe-2" style="color: red;"></i>
@@ -27,7 +27,7 @@
         </div>
         <div class="row">
             <div class="col-sm-12 col-lg-4">
-                <div class="row pb-2">
+                <div class="row pb-4">
                     <img src={{source.thumb_url}}>
                 </div>
                 <div class="row pt-2 pb-4 justify-content-start">
@@ -42,13 +42,15 @@
                     </div>
                 </div>
             </div>
+            {% if source.snippets|length > 0 %}
             <div class="col-sm-12 col-lg-8">
                 {% for snippet in source.snippets %}
                 {{ render_partial("partials/snippet.html", snippet=snippet, source=source) }}
                 {% endfor %}
             </div>
+            {% endif %}
         </div>
-        <hr class="border-1 pb-5" />
+        <hr class="border-2 pb-5" />
     </div>
     {% endfor %}
 </div>

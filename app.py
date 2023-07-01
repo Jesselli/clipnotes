@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 
 from models import Session, User, db
 from routes import api, main
-from services import readwise, source_processors
+from services import source_processors
 
 app = Flask(__name__)
 CORS(app)
@@ -18,10 +18,6 @@ CORS(app)
 queue_thread = Thread(target=source_processors.process_queue)
 queue_thread.daemon = True
 queue_thread.start()
-
-external_sync_thread = Thread(target=readwise.timer_job)
-external_sync_thread.daemon = True
-external_sync_thread.start()
 
 login_manager = LoginManager()
 login_manager.login_view = "main.login"
