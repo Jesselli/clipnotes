@@ -15,30 +15,32 @@
 
     {% for source in sources %}
     <div class="source" id="source{{source.id}}">
-        <div class="row">
-            <div class="col-md-auto d-flex align-items-center pb-3">
-                <a href="{{source.url}}" class="text-decoration-none">
-                    {% if source.provider.value == 1 %}
-                    <i class="fas fa-brands fa-youtube fa-2xl" style="color: red;"></i>
-                    {% elif source.provider.value == 2 %}
-                    <i class="fas fa-sharp fa-solid fa-podcast fa-2xl" style="color: red"></i>
-                    {% endif %}
-                </a>
-            </div>
-            <div class="col-11">
-                <a href="{{source.url}}" class="text-decoration-none text-light-emphasis redhover">
-                    <p class="fs-2 text-truncate">{{ source.title }}</p>
-                </a>
-            </div>
+        <div class="row pb-2">
+            <a href="{{source.url}}" class="text-decoration-none">
+                {% if source.provider.value == 1 %}
+                <i class="fas fa-brands fa-youtube fa-2x pe-2" style="color: red;"></i>
+                {% elif source.provider.value == 2 %}
+                <i class="fas fa-sharp fa-solid fa-podcast fa-2x pe-2" style="color: red"></i>
+                {% endif %}
+                <span class="h3 text-light-emphasis">{{ source.title }}</span>
+            </a>
         </div>
-        <div class="row row-cols-sm-1 row-cols-lg-2">
-            <div class="col-sm-12 col-lg-4 pb-4">
-                <img src={{source.thumb_url}} class="img-fluid shadow">
-                <i hx-trigger="click" hx-delete="/source/{{source.id}}" hx-target="#source{{source.id}}"
-                    hx-confirm="Are you sure?" hx-swap="innerHTML swap:1s"
-                    class="fa-sharp fa-regular fa-trash-can fa-xl pt-4 pe-2 redhover"></i>
-                <i class="fa-sharp fa-solid fa-copy fa-xl redhover liveToastBtn"
-                    onclick="copyToClipboard({{source.id}})"></i>
+        <div class="row">
+            <div class="col-sm-12 col-lg-4">
+                <div class="row pb-2">
+                    <img src={{source.thumb_url}}>
+                </div>
+                <div class="row pt-2 pb-4 justify-content-start">
+                    <div class="col-auto">
+                        <i hx-trigger="click" hx-delete="/source/{{source.id}}" hx-target="#source{{source.id}}"
+                            hx-confirm="Are you sure?" hx-swap="innerHTML swap:1s"
+                            class="fa-sharp fa-regular fa-trash-can fa-xl redhover"></i>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fa-sharp fa-solid fa-copy fa-xl redhover liveToastBtn"
+                            onclick="copyToClipboard({{source.id}})"></i>
+                    </div>
+                </div>
             </div>
             <div class="col-sm-12 col-lg-8">
                 {% for snippet in source.snippets %}
