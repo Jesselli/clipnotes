@@ -42,13 +42,11 @@
                     </div>
                 </div>
             </div>
-            {% if source.snippets|length > 0 %}
             <div class="col-sm-12 col-lg-8">
                 {% for snippet in source.snippets %}
                 {{ render_partial("partials/snippet.html", snippet=snippet, source=source) }}
                 {% endfor %}
             </div>
-            {% endif %}
         </div>
         <hr class="border-2 pb-5" />
     </div>

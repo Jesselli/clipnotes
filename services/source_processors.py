@@ -100,7 +100,7 @@ def download_youtube_data(queue_item: db.Snippet) -> Optional[dict]:
 
 def download_pocketcast_data(queue_item: db.Snippet):
     info_dict = {}
-    url = queue_item.url
+    url = queue_item.get_source_url()
     info_dict["url"] = url
 
     r = requests.get(url)
