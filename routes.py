@@ -1,3 +1,4 @@
+import shutil
 import uuid
 
 from flask import (
@@ -20,55 +21,74 @@ from services.markdown import generate_source_markdown
 main = Blueprint("main", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
 
+
 @main.get("/audible_bookmarks")
 def get_audible_bookmarks():
     auth = audible.Authenticator.from_file("audible_auth.json")
+    auth.get_activation_bytes("activation_bytes", True)
     with audible.Client(auth=auth) as client:
         library = client.get(
             "1.0/library",
             num_results=1000,
             response_groups="product_desc, product_attrs",
-            sort_by="-PurchaseDate"
+            sort_by="-PurchaseDate",
         )
         books = library["items"]
-        book = books[0]
         for book in books:
             client._response_callback = cback
-            bookmarks = get_bookmarks(client, book['asin'])
+            bookmarks = get_bookmarks(client, book["asin"])
             print(f"{book['title']} -- {len(bookmarks['bookmarks'])}")
             print(bookmarks)
             print("")
+            download_book(client, book["asin"])
+
+
+def download_book(client, asin):
+    client._response_callback = download_callback
+    url = f"https://www.audible.com/library/download?asin={asin}&codec=AAX"
+    resp = client.get(url)
+    print(resp)
+    with requests.get(resp.url, stream=True) as r:
+        with open(f"{asin}.aax", "wb") as f:
+            shutil.copyfileobj(r.raw, f)
+
+
+def download_callback(resp):
+    return resp.next_request
+
 
 def cback(resp):
     return resp
-    
-def get_bookmarks(client, asin):
-    url =  f"https://cde-ta-g7g.amazon.com/FionaCDEServiceEngine/sidecar?type=AUDI&key={asin}"
-    resp = client.get(url)
 
-    url = resp.url
-    print(url)
-    bookmarks_dict = {"bookmarks":[],"full_text":""}
+
+def get_bookmarks(client, asin):
+    url = f"https://cde-ta-g7g.amazon.com/FionaCDEServiceEngine/sidecar?type=AUDI&key={asin}"
+    resp = client.get(url)
+    bookmarks_dict = {"bookmarks": [], "full_text": ""}
     try:
         body = resp.json()["payload"]
-        
-        for i,bookmark in enumerate(body["records"]):
-            if bookmark['type'] != 'audible.clip':
+
+        for i, bookmark in enumerate(body["records"]):
+            if bookmark["type"] != "audible.clip":
                 continue
-            
+
             creationTime = bookmark.get("creationTime")
             startPosition = bookmark.get("startPosition")
             endPosition = bookmark.get("endPosition")
-            bookmark_line = f'#{i} created: {creationTime} from:{startPosition}-{endPosition}'
+            bookmark_line = (
+                f"#{i} created: {creationTime} from:{startPosition}-{endPosition}"
+            )
             bookmarks_dict["bookmarks"].append(bookmark_line)
-    except:
+    except KeyError:
         print("FAILED response")
         print(resp.text)
     return bookmarks_dict
 
+
 @main.get("/register")
 def register():
     return render_template("register.html")
+
 
 @main.get("/login")
 def login():
