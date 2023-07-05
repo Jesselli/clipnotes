@@ -11,7 +11,8 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-
+import requests
+import audible
 import models as db
 from services.time_str import get_time_from_url, get_url_without_time
 from services.markdown import generate_source_markdown
@@ -19,11 +20,55 @@ from services.markdown import generate_source_markdown
 main = Blueprint("main", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
 
+@main.get("/audible_bookmarks")
+def get_audible_bookmarks():
+    auth = audible.Authenticator.from_file("audible_auth.json")
+    with audible.Client(auth=auth) as client:
+        library = client.get(
+            "1.0/library",
+            num_results=1000,
+            response_groups="product_desc, product_attrs",
+            sort_by="-PurchaseDate"
+        )
+        books = library["items"]
+        book = books[0]
+        for book in books:
+            client._response_callback = cback
+            bookmarks = get_bookmarks(client, book['asin'])
+            print(f"{book['title']} -- {len(bookmarks['bookmarks'])}")
+            print(bookmarks)
+            print("")
+
+def cback(resp):
+    return resp
+    
+def get_bookmarks(client, asin):
+    url =  f"https://cde-ta-g7g.amazon.com/FionaCDEServiceEngine/sidecar?type=AUDI&key={asin}"
+    resp = client.get(url)
+
+    url = resp.url
+    print(url)
+    bookmarks_dict = {"bookmarks":[],"full_text":""}
+    try:
+        body = resp.json()["payload"]
+        
+        for i,bookmark in enumerate(body["records"]):
+            if bookmark['type'] != 'audible.clip':
+                continue
+            
+            creationTime = bookmark.get("creationTime")
+            startPosition = bookmark.get("startPosition")
+            endPosition = bookmark.get("endPosition")
+            bookmark_line = f'#{i} created: {creationTime} from:{startPosition}-{endPosition}'
+            bookmarks_dict["bookmarks"].append(bookmark_line)
+    except:
+        print("FAILED response")
+        print(resp.text)
+    return bookmarks_dict
 
 @main.get("/register")
 def register():
     return render_template("register.html")
-
 
 @main.get("/login")
 def login():
