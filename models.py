@@ -175,18 +175,21 @@ class Source(db.Model, BaseModel):
         return f"<Source {self.id} - {self.title}>"
 
     @staticmethod
-    def add(url):
+    def add(url, provider: SourceProvider = None, title: str = None):
         url = url_without_query(url)
         existing = Session.query(Source).filter_by(url=url).first()
         if existing:
             return existing
 
         source = Source(url=url)
+        source.provider = provider
+        source.title = title
         parsed_url = urlparse(url)
-        if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
-            source.provider = SourceProvider.YOUTUBE
-        if parsed_url.hostname in ["pca.st"]:
-            source.provider = SourceProvider.POCKETCASTS
+        if provider is None:
+            if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
+                source.provider = SourceProvider.YOUTUBE
+            elif parsed_url.hostname in ["pca.st"]:
+                source.provider = SourceProvider.POCKETCASTS
         source.add_to_db()
         return source
 

@@ -1,3 +1,4 @@
+import os
 import shutil
 import uuid
 
@@ -12,77 +13,57 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
+import logging
 import requests
-import audible
 import models as db
 from services.time_str import get_time_from_url, get_url_without_time
 from services.markdown import generate_source_markdown
+from services.audible import get_all_clips
 
 main = Blueprint("main", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
 
 
 @main.get("/audible_bookmarks")
+@login_required
 def get_audible_bookmarks():
-    auth = audible.Authenticator.from_file("audible_auth.json")
-    auth.get_activation_bytes("activation_bytes", True)
-    with audible.Client(auth=auth) as client:
-        library = client.get(
-            "1.0/library",
-            num_results=1000,
-            response_groups="product_desc, product_attrs",
-            sort_by="-PurchaseDate",
+    clips = get_all_clips()
+    for clip in clips:
+        source = db.Source.add(
+            url=f"file://{clip.asin}.aax",
+            title=clip.title,
+            provider=db.SourceProvider.AUDIBLE,
         )
-        books = library["items"]
-        for book in books:
-            client._response_callback = cback
-            bookmarks = get_bookmarks(client, book["asin"])
-            print(f"{book['title']} -- {len(bookmarks['bookmarks'])}")
-            print(bookmarks)
-            print("")
-            download_book(client, book["asin"])
+        db.Snippet.add(
+            current_user.id,
+            source.id,
+            clip.startTime,
+            clip.endTime,
+        )
+    return ""
+    # download_book(client, book["asin"])
 
 
-def download_book(client, asin):
-    client._response_callback = download_callback
+def book_file_exists(asin):
+    # TODO: Check for other file types with the same name
+    # TOOD: Specify a directory for the books in the configuration
+    return os.path.isfile(f"{asin}.aax")
+
+
+def download_book(client, asin) -> bool:
+    if book_file_exists(asin):
+        logging.info(f"Book {asin} already downloaded")
+        return False
+
+    client._response_callback = lambda resp: resp.next_request
     url = f"https://www.audible.com/library/download?asin={asin}&codec=AAX"
     resp = client.get(url)
-    print(resp)
     with requests.get(resp.url, stream=True) as r:
         with open(f"{asin}.aax", "wb") as f:
             shutil.copyfileobj(r.raw, f)
 
-
-def download_callback(resp):
-    return resp.next_request
-
-
-def cback(resp):
-    return resp
-
-
-def get_bookmarks(client, asin):
-    url = f"https://cde-ta-g7g.amazon.com/FionaCDEServiceEngine/sidecar?type=AUDI&key={asin}"
-    resp = client.get(url)
-    bookmarks_dict = {"bookmarks": [], "full_text": ""}
-    try:
-        body = resp.json()["payload"]
-
-        for i, bookmark in enumerate(body["records"]):
-            if bookmark["type"] != "audible.clip":
-                continue
-
-            creationTime = bookmark.get("creationTime")
-            startPosition = bookmark.get("startPosition")
-            endPosition = bookmark.get("endPosition")
-            bookmark_line = (
-                f"#{i} created: {creationTime} from:{startPosition}-{endPosition}"
-            )
-            bookmarks_dict["bookmarks"].append(bookmark_line)
-    except KeyError:
-        print("FAILED response")
-        print(resp.text)
-    return bookmarks_dict
+    logging.info(f"Downloaded {asin}")
+    return True
 
 
 @main.get("/register")
