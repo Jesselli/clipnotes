@@ -134,7 +134,11 @@ class Snippet(db.Model, BaseModel):
             Snippet.status != SnippetStatus.DONE,
         )
         snippet_queue = (
-            Session.query(Snippet).filter(filter).order_by(Snippet.created_at).all()
+            Session.query(Snippet)
+            .filter(filter)
+            .order_by(Snippet.created_at)
+            .limit(5)
+            .all()
         )
         for snippet in snippet_queue:
             snippet.url = snippet.get_source_url()
@@ -161,6 +165,28 @@ class Snippet(db.Model, BaseModel):
 
 
 @dataclass
+class Audible(db.Model, BaseModel):
+    id = db.Column(db.Integer, primary_key=True)
+    # TODO Look up ForeignKey vs relationship, etc.
+    snippet_id = db.Column(db.Integer, db.ForeignKey("snippet.id"), nullable=False)
+    asin = db.Column(db.String(10), nullable=False)
+
+    @staticmethod
+    def add(snippet_id, asin):
+        audible_db = Audible(
+            snippet_id=snippet_id,
+            asin=asin,
+        )
+        audible_db.add_to_db()
+
+    @staticmethod
+    def get_audible_data(snippet_id) -> Audible:
+        # TODO Look up filter_by vs where
+        audible = Session.query(Audible).filter_by(snippet_id=snippet_id).first()
+        return audible
+
+
+@dataclass
 class Source(db.Model, BaseModel):
     provider: SourceProvider
 
@@ -175,7 +201,12 @@ class Source(db.Model, BaseModel):
         return f"<Source {self.id} - {self.title}>"
 
     @staticmethod
-    def add(url, provider: SourceProvider = None, title: str = None):
+    def add(
+        url,
+        provider: SourceProvider = None,
+        title: str = None,
+        thumb_url: str = None,
+    ):
         url = url_without_query(url)
         existing = Session.query(Source).filter_by(url=url).first()
         if existing:
@@ -184,6 +215,7 @@ class Source(db.Model, BaseModel):
         source = Source(url=url)
         source.provider = provider
         source.title = title
+        source.thumb_url = thumb_url
         parsed_url = urlparse(url)
         if provider is None:
             if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:

@@ -1,5 +1,3 @@
-import os
-import shutil
 import uuid
 
 from flask import (
@@ -13,12 +11,10 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-import logging
-import requests
 import models as db
 from services.time_str import get_time_from_url, get_url_without_time
 from services.markdown import generate_source_markdown
-from services.audible import get_all_clips
+from services.audible import get_all_clips, create_models
 
 main = Blueprint("main", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -29,41 +25,11 @@ api = Blueprint("api", __name__, url_prefix="/api")
 def get_audible_bookmarks():
     clips = get_all_clips()
     for clip in clips:
-        source = db.Source.add(
-            url=f"file://{clip.asin}.aax",
-            title=clip.title,
-            provider=db.SourceProvider.AUDIBLE,
-        )
-        db.Snippet.add(
+        create_models(
             current_user.id,
-            source.id,
-            clip.startTime,
-            clip.endTime,
+            clip,
         )
     return ""
-    # download_book(client, book["asin"])
-
-
-def book_file_exists(asin):
-    # TODO: Check for other file types with the same name
-    # TOOD: Specify a directory for the books in the configuration
-    return os.path.isfile(f"{asin}.aax")
-
-
-def download_book(client, asin) -> bool:
-    if book_file_exists(asin):
-        logging.info(f"Book {asin} already downloaded")
-        return False
-
-    client._response_callback = lambda resp: resp.next_request
-    url = f"https://www.audible.com/library/download?asin={asin}&codec=AAX"
-    resp = client.get(url)
-    with requests.get(resp.url, stream=True) as r:
-        with open(f"{asin}.aax", "wb") as f:
-            shutil.copyfileobj(r.raw, f)
-
-    logging.info(f"Downloaded {asin}")
-    return True
 
 
 @main.get("/register")
