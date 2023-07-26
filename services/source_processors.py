@@ -10,8 +10,7 @@ import speech_recognition as sr
 from bs4 import BeautifulSoup
 
 import models as db
-from services import files
-from config import Config
+from services import files, audible
 
 r = sr.Recognizer()
 
@@ -34,13 +33,17 @@ def whisper_recognize(clip):
     return text_whisper
 
 
-def transcribe(queue_item: db.Snippet, audio_filepath: str):
+def clip_audio(source: db.Source, queue_item: db.Snippet, audio_filepath: str):
     start_time = queue_item.start_time
     end_time = queue_item.end_time
 
-    clip_wav = files.create_wav_clip(audio_filepath, start_time, end_time)
-    text = whisper_recognize(clip_wav)
-    return text
+    # TODO This should be based on file type not on source
+    if source.provider == db.SourceProvider.AUDIBLE:
+        clip_path = files.clip_m4b_to_wav(audio_filepath, start_time, end_time)
+    else:
+        clip_path = files.clip_mp3_to_wav(audio_filepath, start_time, end_time)
+
+    return clip_path
 
 
 def process_snippet_task(queue_item: db.Snippet):
@@ -60,10 +63,16 @@ def process_snippet_task(queue_item: db.Snippet):
         audio_filepath = pc_info["audio_filepath"]
         source.update_title(pc_info["title"])
         source.update_thumb_url(pc_info["thumbnail"])
+    elif source.provider == db.SourceProvider.AUDIBLE:
+        # TODO Use this pattern for YouTube and PocketCast?
+        queue_item.update_status(db.SnippetStatus.DOWNLOADING)
+        audio_filepath = audible.download_audible_data(queue_item)
+        # TODO If we don't get a filepath, we need to set status to ERROR
 
     if source and audio_filepath:
+        clip_path = clip_audio(source, queue_item, audio_filepath)
         queue_item.update_status(db.SnippetStatus.TRANSCRIBING)
-        text = transcribe(queue_item, audio_filepath)
+        text = whisper_recognize(clip_path)
 
         queue_item.update_text(text)
         queue_item.update_status(db.SnippetStatus.DONE)
@@ -72,12 +81,11 @@ def process_snippet_task(queue_item: db.Snippet):
 
 
 def download_youtube_data(queue_item: db.Snippet) -> Optional[dict]:
-    # TODO Create table for queue item status? Or an enum?
-
     filename = uuid.uuid4()
+    tmp_directory = files.get_tmp_dir()
     ydl_opts = {
         "format": "mp3/bestaudio/best",
-        "outtmpl": f"{Config.TMP_DIRECTORY}/{filename}.%(ext)s",
+        "outtmpl": f"{tmp_directory}/{filename}.%(ext)s",
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -93,7 +101,7 @@ def download_youtube_data(queue_item: db.Snippet) -> Optional[dict]:
         ydl.download([url])
 
     # TODO Might not always be mp3.
-    info_dict["audio_filepath"] = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
+    info_dict["audio_filepath"] = f"{tmp_directory}/{filename}.mp3"
     info_dict["url"] = url
     return info_dict
 

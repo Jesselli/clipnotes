@@ -1,6 +1,7 @@
 import os
 import logging
 from threading import Thread
+import click
 
 import jinja_partials
 from flask import Flask
@@ -10,14 +11,11 @@ from sqlalchemy import create_engine
 
 from models import Session, User, db
 from routes import api, main
-from services import source_processors
+from services import source_processors, audible
 
 app = Flask(__name__)
 CORS(app)
 
-queue_thread = Thread(target=source_processors.process_queue)
-queue_thread.daemon = True
-queue_thread.start()
 
 login_manager = LoginManager()
 login_manager.login_view = "main.login"
@@ -38,6 +36,16 @@ def config_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 
 
+def start_threads():
+    queue_thread = Thread(target=source_processors.process_queue)
+    queue_thread.daemon = True
+    queue_thread.start()
+
+    audible_thread = Thread(target=audible.sync_with_audible)
+    audible_thread.daemon = True
+    audible_thread.start()
+
+
 @app.cli.command("create-db")
 def create_db():
     config_app()
@@ -50,6 +58,20 @@ def drop_db():
     config_app()
     db.init_app(app)
     db.drop_all()
+
+
+@app.cli.command("audible-auth")
+@click.argument("email")
+@click.argument("password")
+def authenticate_audible(email: str, password: str):
+    config_app()
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI")
+    engine = create_engine(
+        f"{db_uri}?check_same_thread=False",
+    )
+    Session.configure(bind=engine)
+    db.init_app(app)
+    audible.save_audible_auth_to_file(email, password)
 
 
 @login_manager.user_loader
@@ -71,6 +93,7 @@ def create_app():
     db.init_app(app)
     jinja_partials.register_extensions(app)
 
+    start_threads()
     return app
 
 

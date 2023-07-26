@@ -11,7 +11,6 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-
 import models as db
 from services.time_str import get_time_from_url, get_url_without_time
 from services.markdown import generate_source_markdown

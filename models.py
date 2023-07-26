@@ -36,6 +36,7 @@ class SnippetStatus(Enum):
     DOWNLOADING = 3
     TRANSCRIBING = 4
     DONE = 5
+    ERROR = 6
 
 
 class BaseModel:
@@ -58,6 +59,31 @@ class BaseModel:
         if inspect.isfunction(returned) or inspect.ismethod(returned):
             logging.debug(f"Calling {__name} on {self}")
         return returned
+
+
+@dataclass
+class AudibleSyncRecord(db.Model, BaseModel):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    synced_at = db.Column(db.DateTime, default=db.func.now())
+
+    @staticmethod
+    def get_user_last_sync(user_id: int):
+        record = Session.query(AudibleSyncRecord).filter_by(user_id=user_id).first()
+        if record:
+            return record.synced_at
+        else:
+            return None
+
+    @staticmethod
+    def update_user_sync_record(user_id: int):
+        record = Session.query(AudibleSyncRecord).filter_by(user_id=user_id).first()
+        if record:
+            record.synced_at = db.func.now()
+            Session.commit()
+        else:
+            record = AudibleSyncRecord(user_id=user_id)
+            record.add_to_db()
 
 
 @dataclass
@@ -134,7 +160,11 @@ class Snippet(db.Model, BaseModel):
             Snippet.status != SnippetStatus.DONE,
         )
         snippet_queue = (
-            Session.query(Snippet).filter(filter).order_by(Snippet.created_at).all()
+            Session.query(Snippet)
+            .filter(filter)
+            .order_by(Snippet.created_at)
+            .limit(5)
+            .all()
         )
         for snippet in snippet_queue:
             snippet.url = snippet.get_source_url()
@@ -161,6 +191,28 @@ class Snippet(db.Model, BaseModel):
 
 
 @dataclass
+class Audible(db.Model, BaseModel):
+    id = db.Column(db.Integer, primary_key=True)
+    # TODO Look up ForeignKey vs relationship, etc.
+    snippet_id = db.Column(db.Integer, db.ForeignKey("snippet.id"), nullable=False)
+    asin = db.Column(db.String(10), nullable=False)
+
+    @staticmethod
+    def add(snippet_id, asin):
+        audible_db = Audible(
+            snippet_id=snippet_id,
+            asin=asin,
+        )
+        audible_db.add_to_db()
+
+    @staticmethod
+    def get_audible_data(snippet_id) -> Audible:
+        # TODO Look up filter_by vs where
+        audible = Session.query(Audible).filter_by(snippet_id=snippet_id).first()
+        return audible
+
+
+@dataclass
 class Source(db.Model, BaseModel):
     provider: SourceProvider
 
@@ -175,18 +227,27 @@ class Source(db.Model, BaseModel):
         return f"<Source {self.id} - {self.title}>"
 
     @staticmethod
-    def add(url):
+    def add(
+        url,
+        provider: SourceProvider = None,
+        title: str = None,
+        thumb_url: str = None,
+    ):
         url = url_without_query(url)
         existing = Session.query(Source).filter_by(url=url).first()
         if existing:
             return existing
 
         source = Source(url=url)
+        source.provider = provider
+        source.title = title
+        source.thumb_url = thumb_url
         parsed_url = urlparse(url)
-        if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
-            source.provider = SourceProvider.YOUTUBE
-        if parsed_url.hostname in ["pca.st"]:
-            source.provider = SourceProvider.POCKETCASTS
+        if provider is None:
+            if parsed_url.hostname in ["www.youtube.com", "youtu.be"]:
+                source.provider = SourceProvider.YOUTUBE
+            elif parsed_url.hostname in ["pca.st"]:
+                source.provider = SourceProvider.POCKETCASTS
         source.add_to_db()
         return source
 
