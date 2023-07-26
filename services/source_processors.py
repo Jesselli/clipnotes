@@ -11,7 +11,6 @@ from bs4 import BeautifulSoup
 
 import models as db
 from services import files, audible
-from config import Config
 
 r = sr.Recognizer()
 
@@ -82,12 +81,11 @@ def process_snippet_task(queue_item: db.Snippet):
 
 
 def download_youtube_data(queue_item: db.Snippet) -> Optional[dict]:
-    # TODO Create table for queue item status? Or an enum?
-
     filename = uuid.uuid4()
+    tmp_directory = files.get_tmp_dir()
     ydl_opts = {
         "format": "mp3/bestaudio/best",
-        "outtmpl": f"{Config.TMP_DIRECTORY}/{filename}.%(ext)s",
+        "outtmpl": f"{tmp_directory}/{filename}.%(ext)s",
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -103,7 +101,7 @@ def download_youtube_data(queue_item: db.Snippet) -> Optional[dict]:
         ydl.download([url])
 
     # TODO Might not always be mp3.
-    info_dict["audio_filepath"] = f"{Config.TMP_DIRECTORY}/{filename}.mp3"
+    info_dict["audio_filepath"] = f"{tmp_directory}/{filename}.mp3"
     info_dict["url"] = url
     return info_dict
 

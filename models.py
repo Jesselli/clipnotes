@@ -36,6 +36,7 @@ class SnippetStatus(Enum):
     DOWNLOADING = 3
     TRANSCRIBING = 4
     DONE = 5
+    ERROR = 6
 
 
 class BaseModel:
@@ -58,6 +59,31 @@ class BaseModel:
         if inspect.isfunction(returned) or inspect.ismethod(returned):
             logging.debug(f"Calling {__name} on {self}")
         return returned
+
+
+@dataclass
+class AudibleSyncRecord(db.Model, BaseModel):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    synced_at = db.Column(db.DateTime, default=db.func.now())
+
+    @staticmethod
+    def get_user_last_sync(user_id: int):
+        record = Session.query(AudibleSyncRecord).filter_by(user_id=user_id).first()
+        if record:
+            return record.synced_at
+        else:
+            return None
+
+    @staticmethod
+    def update_user_sync_record(user_id: int):
+        record = Session.query(AudibleSyncRecord).filter_by(user_id=user_id).first()
+        if record:
+            record.synced_at = db.func.now()
+            Session.commit()
+        else:
+            record = AudibleSyncRecord(user_id=user_id)
+            record.add_to_db()
 
 
 @dataclass

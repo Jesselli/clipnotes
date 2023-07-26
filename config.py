@@ -3,3 +3,4 @@ class Config:
     TMP_MAX_SIZE = 100 * 1000 * 1000
     AUDIBLE_DIRECTORY = "./audible"
     AUDIBLE_MAX_SIZE = 1000 * 1000 * 1000
+    AUDIBLE_SYNC_SECONDS = 60 * 60

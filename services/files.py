@@ -9,7 +9,18 @@ from pydub import AudioSegment
 from config import Config
 
 
-def download_file(url, directory=Config.TMP_DIRECTORY, filename=None):
+def get_tmp_dir():
+    os.makedirs(Config.TMP_DIRECTORY, exist_ok=True)
+    return Config.TMP_DIRECTORY
+
+
+def get_audible_dir():
+    os.makedirs(Config.AUDIBLE_DIRECTORY, exist_ok=True)
+    return Config.AUDIBLE_DIRECTORY
+
+
+def download_file(url, filename=None):
+    directory = get_tmp_dir()
     r = requests.get(url)
     parsed_url = urlparse(url)
 
@@ -18,7 +29,6 @@ def download_file(url, directory=Config.TMP_DIRECTORY, filename=None):
     else:
         filename = filename + "." + parsed_url.path.split(".")[-1]
 
-    os.makedirs(directory, exist_ok=True)
     filepath = os.path.join(directory, filename)
     with open(filepath, "wb") as f:
         f.write(r.content)
@@ -29,7 +39,7 @@ def clip_m4b_to_wav(filepath, start_time, end_time):
     start_seconds = str(start_time)
     duration_seconds = str(end_time - start_time)
     path = pathlib.Path(filepath)
-    clip_path = f"{Config.TMP_DIRECTORY}/{path.stem}_clip.wav"
+    clip_path = f"{get_tmp_dir()}/{path.stem}_clip.wav"
     subprocess.run(
         [
             "ffmpeg",
@@ -57,5 +67,6 @@ def clip_mp3_to_wav(filepath, start_time, end_time):
 
 
 def cleanup_tmp_files():
-    for f in os.listdir(Config.TMP_DIRECTORY):
-        os.remove(os.path.join(Config.TMP_DIRECTORY, f))
+    tmp_directory = get_tmp_dir()
+    for f in os.listdir(tmp_directory):
+        os.remove(os.path.join(tmp_directory, f))
