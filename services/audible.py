@@ -71,6 +71,7 @@ class AudibleClip:
 
 def get_library_items(user_id: int) -> List:
     auth = get_audible_auth(user_id)
+
     with audible.Client(auth=auth) as client:
         library = client.get(
             "1.0/library",
@@ -206,11 +207,11 @@ def aax_to_m4b(aax_path: str, activation_bytes: str) -> Optional[str]:
 
 def download_audible_data(queue_item: db.Snippet) -> Optional[str]:
     auth = get_audible_auth(queue_item.user_id)
-    activation_bytes = get_activation_bytes(queue_item.user_id)
-    audible_data = db.Audible.get_audible_data(queue_item.id)
     with audible.Client(auth=auth) as client:
+        audible_data = db.Audible.get_audible_data(queue_item.id)
         book_file = download_book(client, audible_data.asin)
     if book_file.endswith("aax"):
+        activation_bytes = get_activation_bytes(queue_item.user_id)
         book_file = aax_to_m4b(book_file, activation_bytes)
     return book_file
 
@@ -219,14 +220,24 @@ def sync_with_audible():
     while True:
         for user in db.User.get_all():
             logging.info(f"Syncing with Audible for user {user.id}")
+            if not user_has_audible_auth(user.id):
+                logging.info(f"No audible_auth for user {user.id}")
+                continue
             clips = get_new_clips(user.id)
-            logging.info(f"Found {len(clips)} new Audible clips")
+            logging.info(f"Found {len(clips)} new Audible clips for user {user.id}")
             for clip in clips:
                 create_models(
                     user.id,
                     clip,
                 )
         time.sleep(Config.AUDIBLE_SYNC_SECONDS)
+
+
+def print_captcha_url(url: str):
+    print(f"CAPTCHA URL: {url}")
+    print("Please enter the CAPTCHA value: ", end="")
+    captcha = input()
+    return captcha
 
 
 def save_audible_auth_to_file(email: str, password: str):
@@ -240,16 +251,26 @@ def save_audible_auth_to_file(email: str, password: str):
         password,
         locale="us",
         with_username=False,
+        captcha_callback=print_captcha_url,
     )
 
     user_id = str(user.id)
-    audible_directory = files.get_audible_dir()
-    file = os.path.join(audible_directory, user_id, "audible_auth.json")
+    audible_user_dir = files.get_audible_user_dir(user_id)
+    file = os.path.join(audible_user_dir, "audible_auth.json")
     auth.to_file(file)
     return auth
 
 
-def get_audible_auth(user_id: int) -> audible.Authenticator:
+def user_has_audible_auth(user_id: int) -> bool:
+    auth_file = os.path.join(
+        files.get_audible_dir(),
+        str(user_id),
+        "audible_auth.json",
+    )
+    return os.path.exists(auth_file)
+
+
+def get_audible_auth(user_id: int) -> Optional[audible.Authenticator]:
     auth_file = os.path.join(
         files.get_audible_dir(),
         str(user_id),
@@ -258,10 +279,11 @@ def get_audible_auth(user_id: int) -> audible.Authenticator:
     return audible.Authenticator.from_file(auth_file)
 
 
-def get_activation_bytes(user_id: int):
+def get_activation_bytes(user_id: int) -> str:
     activation_file = os.path.join(
         files.get_audible_dir(),
         str(user_id),
         "activation_bytes",
     )
-    return get_audible_auth(user_id).get_activation_bytes(activation_file, True)
+    auth = get_audible_auth(user_id)
+    return auth.get_activation_bytes(activation_file, True)

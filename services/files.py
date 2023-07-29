@@ -19,6 +19,12 @@ def get_audible_dir():
     return Config.AUDIBLE_DIRECTORY
 
 
+def get_audible_user_dir(user_id: int) -> str:
+    path = os.path.join(get_audible_dir(), str(user_id))
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 def download_file(url, filename=None):
     directory = get_tmp_dir()
     r = requests.get(url)
